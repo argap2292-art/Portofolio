@@ -248,7 +248,7 @@ export const PublicationSection: React.FC<PublicationSectionProps> = ({
 
                         {/* Tags */}
                         <div className="mt-4 flex flex-wrap items-center gap-1.5">
-                          {pub.tags.map((tag, tIdx) => (
+                          {(pub.tags || []).map((tag, tIdx) => (
                             <span
                               key={tIdx}
                               className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600"

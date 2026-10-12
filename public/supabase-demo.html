@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Integrasi Supabase Portofolio - Arga Putra Pratama</title>
+  <!-- Tailwind CSS CDN untuk styling modern & responsif -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS Client v2 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen py-10 px-4 font-sans">
+  <div class="max-w-6xl mx-auto space-y-10">
+    
+    <!-- Header -->
+    <header class="text-center space-y-2 border-b border-slate-800 pb-6">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        Supabase Cloud Database Terkoneksi
+      </div>
+      <h1 class="text-3xl font-extrabold text-white tracking-tight">Koneksi Database Supabase</h1>
+      <p class="text-sm text-slate-400 max-w-xl mx-auto">
+        Dokumentasi & Demo Form Input Sinkronisasi Online untuk Tabel <span class="text-emerald-400 font-semibold">Publikasi</span> dan <span class="text-emerald-400 font-semibold">Karya Inovasi</span>.
+      </p>
+    </header>
+
+    <!-- PENTING: Informasi RLS Supabase -->
+    <div class="bg-amber-950/40 border border-amber-600/40 rounded-2xl p-5 text-sm text-amber-200">
+      <h3 class="font-bold flex items-center gap-2 text-amber-300">
+        💡 Petunjuk Hak Akses (Row Level Security / RLS) di Supabase:
+      </h3>
+      <p class="mt-1 text-xs text-amber-300/80 leading-relaxed">
+        Jika Anda mengalami pesan eror <code class="bg-black/30 px-1.5 py-0.5 rounded text-amber-200">new row violates row-level security policy</code> saat menyimpan data, pastikan Anda telah mengaktifkan Policy akses publik di Supabase SQL Editor dengan menjalankan perintah berikut:
+      </p>
+      <pre class="mt-3 p-3 rounded-xl bg-slate-950 text-emerald-300 text-xs overflow-x-auto font-mono">
+-- Tambahkan kolom yang belum ada (jika belum dibuat)
+ALTER TABLE "Publikasi" ADD COLUMN IF NOT EXISTS "Nomor ISBN/DOI" text, ADD COLUMN IF NOT EXISTS "Abstrak" text;
+ALTER TABLE "Karya Inovasi" ADD COLUMN IF NOT EXISTS "Deskripsi Lengkap" text, ADD COLUMN IF NOT EXISTS "Tautan Eksternal/Dok" text;
+
+-- Izinkan akses baca dan tulis untuk anonim
+ALTER TABLE "Publikasi" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Akses Publik Publikasi" ON "Publikasi" FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE "Karya Inovasi" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Akses Publik Karya Inovasi" ON "Karya Inovasi" FOR ALL TO anon USING (true) WITH CHECK (true);</pre>
+    </div>
+
+    <!-- Grid 2 Kolom: Form Publikasi & Form Karya Inovasi -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+      <!-- ================= 1. FORM & DAFTAR PUBLIKASI ================= -->
+      <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between border-b border-slate-700/60 pb-4 mb-4">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              📚 Form Input: Tabel "Publikasi"
+            </h2>
+            <span id="badge-publikasi" class="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">0 data</span>
+          </div>
+
+          <form id="form-publikasi" class="space-y-3.5 text-xs">
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Judul Publikasi *</label>
+              <input type="text" id="pub-judul" required placeholder="Contoh: Optimalisasi Media Smart TV dalam Pembelajaran PAI" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-300 font-medium mb-1">Jenis Karya</label>
+                <select id="pub-jenis" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+                  <option value="Tesis">Tesis</option>
+                  <option value="Skripsi">Skripsi</option>
+                  <option value="Jurnal">Jurnal</option>
+                  <option value="Prosiding">Prosiding</option>
+                  <option value="Buku / Modul">Buku / Modul</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-300 font-medium mb-1">Tahun Terbit</label>
+                <input type="text" id="pub-tahun" value="2025" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-300 font-medium mb-1">Penerbit / Kampus</label>
+                <input type="text" id="pub-penerbit" placeholder="UIN Ponorogo" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+              </div>
+              <div>
+                <label class="block text-slate-300 font-medium mb-1">Nomor ISBN / DOI</label>
+                <input type="text" id="pub-isbn" placeholder="10.1234/pai.2025" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Abstrak</label>
+              <textarea id="pub-abstrak" rows="2" placeholder="Ringkasan abstrak publikasi..." class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Tautan File / Repositori</label>
+              <input type="url" id="pub-tautan" placeholder="https://etheses.uinponorogo.ac.id/..." class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <button type="submit" id="btn-submit-pub" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-semibold text-white transition-colors shadow-lg">
+              Simpan ke Supabase (Tabel Publikasi)
+            </button>
+          </form>
+        </div>
+
+        <!-- Hasil Fetch Publikasi -->
+        <div class="mt-6 border-t border-slate-700/60 pt-4">
+          <h4 class="text-xs font-semibold text-slate-300 mb-2">Daftar Data Tersimpan di Supabase:</h4>
+          <div id="list-publikasi" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+            <p class="text-slate-500 text-xs italic">Memuat data dari Supabase...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= 2. FORM & DAFTAR KARYA INOVASI ================= -->
+      <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between border-b border-slate-700/60 pb-4 mb-4">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              💡 Form Input: Tabel "Karya Inovasi"
+            </h2>
+            <span id="badge-inovasi" class="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">0 data</span>
+          </div>
+
+          <form id="form-inovasi" class="space-y-3.5 text-xs">
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Judul Karya *</label>
+              <input type="text" id="inv-judul" required placeholder="Contoh: Media Pembelajaran PAI Berbasis Smart Screen" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-300 font-medium mb-1">Kategori Program</label>
+                <select id="inv-kategori" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+                  <option value="Media Digital & Smart Screen">Media Digital & Smart Screen</option>
+                  <option value="Ekstrakurikuler & Seni Rebana">Ekstrakurikuler & Seni Rebana</option>
+                  <option value="Pembinaan Karakter & Pramuka">Pembinaan Karakter & Pramuka</option>
+                  <option value="Modul Ajar & Kurikulum">Modul Ajar & Kurikulum</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-300 font-medium mb-1">Tahun Pelaksanaan</label>
+                <input type="text" id="inv-tahun" value="2025" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Deskripsi Lengkap</label>
+              <textarea id="inv-deskripsi" rows="2" placeholder="Uraian inovasi, tujuan, dan dampaknya bagi siswa..." class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Kata Kunci (Pisahkan dengan koma)</label>
+              <input type="text" id="inv-katakunci" placeholder="Smart TV, PAI, Kurikulum Merdeka" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Tautan Eksternal / Dok (Google Drive, YouTube, dll)</label>
+              <input type="url" id="inv-tautan" placeholder="https://drive.google.com/... atau https://youtube.com/..." class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <button type="submit" id="btn-submit-inv" class="w-full py-2.5 px-4 rounded-xl bg-teal-600 hover:teal-500 font-semibold text-white transition-colors shadow-lg">
+              Simpan ke Supabase (Tabel Karya Inovasi)
+            </button>
+          </form>
+        </div>
+
+        <!-- Hasil Fetch Karya Inovasi -->
+        <div class="mt-6 border-t border-slate-700/60 pt-4">
+          <h4 class="text-xs font-semibold text-slate-300 mb-2">Daftar Data Tersimpan di Supabase:</h4>
+          <div id="list-inovasi" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+            <p class="text-slate-500 text-xs italic">Memuat data dari Supabase...</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= JAVASCRIPT LOGIC DENGAN CDN SUPABASE ================= -->
+  <script>
+    // 1. Inisialisasi Supabase Client
+    const SUPABASE_URL = 'https://xnlckffyduujdidvvrtj.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhubGNrZmZ5ZHV1amRpZHZ2cnRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4Mjg5NzIsImV4cCI6MjEwNzQwNDk3Mn0.8LLx590UrhfyeuJ34Ph-MdM99dNO54bLq8GklpvA-7g';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 2. Fungsi Fetch & Tampilkan Tabel "Publikasi" Secara Otomatis
+    async function fetchPublikasi() {
+      const container = document.getElementById('list-publikasi');
+      const badge = document.getElementById('badge-publikasi');
+
+      try {
+        const { data, error } = await supabase
+          .from('Publikasi')
+          .select('*')
+          .order('id', { ascending: false });
+
+        if (error) {
+          container.innerHTML = `<div class="p-3 bg-red-950/60 border border-red-700 text-red-300 rounded-lg text-xs">Gagal mengambil data: ${error.message}</div>`;
+          return;
+        }
+
+        badge.textContent = `${data.length} data`;
+
+        if (!data || data.length === 0) {
+          container.innerHTML = `<div class="p-3 bg-slate-900 border border-dashed border-slate-700 text-slate-400 rounded-lg text-xs text-center">Belum ada publikasi tersimpan.</div>`;
+          return;
+        }
+
+        container.innerHTML = data.map(item => `
+          <div class="p-3 bg-slate-900/90 border border-slate-700 rounded-xl space-y-1">
+            <div class="flex items-start justify-between gap-2">
+              <h5 class="font-bold text-white text-xs">${escapeHtml(item.Judul || 'Tanpa Judul')}</h5>
+              <button onclick="hapusPublikasi(${item.id})" class="text-rose-400 hover:text-rose-300 text-[11px] underline">Hapus</button>
+            </div>
+            <p class="text-[11px] text-emerald-400 font-medium">
+              ${escapeHtml(item['Jenis Karya'] || '-')} • Tahun ${escapeHtml(String(item['Tahun Terbit'] || '-'))} • ${escapeHtml(item.Penerbit || '-')}
+            </p>
+            ${item.Abstrak ? `<p class="text-[11px] text-slate-300 line-clamp-2">${escapeHtml(item.Abstrak)}</p>` : ''}
+            ${item['Tautan File'] ? `<a href="${encodeURI(item['Tautan File'])}" target="_blank" class="text-[11px] text-blue-400 hover:underline block truncate">🔗 ${escapeHtml(item['Tautan File'])}</a>` : ''}
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="text-xs text-rose-400">Eror koneksi: ${err.message}</div>`;
+      }
+    }
+
+    // 3. Fungsi Simpan Form Input ke Tabel "Publikasi"
+    document.getElementById('form-publikasi').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-submit-pub');
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+
+      const payload = {
+        'Judul': document.getElementById('pub-judul').value.trim(),
+        'Jenis Karya': document.getElementById('pub-jenis').value,
+        'Tahun Terbit': document.getElementById('pub-tahun').value.trim(),
+        'Penerbit': document.getElementById('pub-penerbit').value.trim() || 'UIN Ponorogo',
+        'Nomor ISBN/DOI': document.getElementById('pub-isbn').value.trim(),
+        'Abstrak': document.getElementById('pub-abstrak').value.trim(),
+        'Tautan File': document.getElementById('pub-tautan').value.trim()
+      };
+
+      try {
+        let { data, error } = await supabase.from('Publikasi').insert([payload]).select();
+
+        // Fallback jika kolom Abstrak/ISBN belum ditambahkan di database
+        if (error && error.message.includes('schema cache')) {
+          const fallbackPayload = {
+            'Judul': payload.Judul,
+            'Jenis Karya': payload['Jenis Karya'],
+            'Tahun Terbit': payload['Tahun Terbit'],
+            'Penerbit': payload.Penerbit,
+            'Tautan File': payload['Tautan File']
+          };
+          const fallbackRes = await supabase.from('Publikasi').insert([fallbackPayload]).select();
+          error = fallbackRes.error;
+        }
+
+        if (error) {
+          alert('Gagal menyimpan ke Supabase:\n' + error.message + '\n\nPeriksa apakah RLS Policy sudah diaktifkan.');
+        } else {
+          document.getElementById('form-publikasi').reset();
+          fetchPublikasi(); // Refresh data otomatis
+        }
+      } catch (err) {
+        alert('Eror: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Simpan ke Supabase (Tabel Publikasi)';
+      }
+    });
+
+    // 4. Fungsi Hapus Data Publikasi
+    async function hapusPublikasi(id) {
+      if (!confirm('Hapus data publikasi ini dari Supabase?')) return;
+      const { error } = await supabase.from('Publikasi').delete().eq('id', id);
+      if (error) {
+        alert('Gagal menghapus: ' + error.message);
+      } else {
+        fetchPublikasi();
+      }
+    }
+
+    // 5. Fungsi Fetch & Tampilkan Tabel "Karya Inovasi" Secara Otomatis
+    async function fetchKaryaInovasi() {
+      const container = document.getElementById('list-inovasi');
+      const badge = document.getElementById('badge-inovasi');
+
+      try {
+        const { data, error } = await supabase
+          .from('Karya Inovasi')
+          .select('*')
+          .order('id', { ascending: false });
+
+        if (error) {
+          container.innerHTML = `<div class="p-3 bg-red-950/60 border border-red-700 text-red-300 rounded-lg text-xs">Gagal mengambil data: ${error.message}</div>`;
+          return;
+        }
+
+        badge.textContent = `${data.length} data`;
+
+        if (!data || data.length === 0) {
+          container.innerHTML = `<div class="p-3 bg-slate-900 border border-dashed border-slate-700 text-slate-400 rounded-lg text-xs text-center">Belum ada karya inovasi tersimpan.</div>`;
+          return;
+        }
+
+        container.innerHTML = data.map(item => `
+          <div class="p-3 bg-slate-900/90 border border-slate-700 rounded-xl space-y-1">
+            <div class="flex items-start justify-between gap-2">
+              <h5 class="font-bold text-white text-xs">${escapeHtml(item['Judul Karya'] || 'Tanpa Judul')}</h5>
+              <button onclick="hapusInovasi(${item.id})" class="text-rose-400 hover:text-rose-300 text-[11px] underline">Hapus</button>
+            </div>
+            <p class="text-[11px] text-teal-400 font-medium">
+              ${escapeHtml(item['Kategori Program'] || '-')} • Tahun ${escapeHtml(String(item['Tahun Pelaksanaan'] || '-'))}
+            </p>
+            ${item['Deskripsi Lengkap'] ? `<p class="text-[11px] text-slate-300 line-clamp-2">${escapeHtml(item['Deskripsi Lengkap'])}</p>` : ''}
+            ${item['Kata Kunci'] ? `<p class="text-[10px] text-slate-400">🏷️ ${escapeHtml(item['Kata Kunci'])}</p>` : ''}
+            ${item['Tautan Eksternal/Dok'] ? `<a href="${encodeURI(item['Tautan Eksternal/Dok'])}" target="_blank" class="text-[11px] text-blue-400 hover:underline block truncate">🔗 ${escapeHtml(item['Tautan Eksternal/Dok'])}</a>` : ''}
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="text-xs text-rose-400">Eror koneksi: ${err.message}</div>`;
+      }
+    }
+
+    // 6. Fungsi Simpan Form Input ke Tabel "Karya Inovasi"
+    document.getElementById('form-inovasi').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-submit-inv');
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+
+      const payload = {
+        'Judul Karya': document.getElementById('inv-judul').value.trim(),
+        'Kategori Program': document.getElementById('inv-kategori').value,
+        'Tahun Pelaksanaan': document.getElementById('inv-tahun').value.trim(),
+        'Deskripsi Lengkap': document.getElementById('inv-deskripsi').value.trim(),
+        'Kata Kunci': document.getElementById('inv-katakunci').value.trim(),
+        'Tautan Eksternal/Dok': document.getElementById('inv-tautan').value.trim()
+      };
+
+      try {
+        let { data, error } = await supabase.from('Karya Inovasi').insert([payload]).select();
+
+        // Fallback jika kolom Deskripsi/Tautan belum ditambahkan
+        if (error && error.message.includes('schema cache')) {
+          const fallbackPayload = {
+            'Judul Karya': payload['Judul Karya'],
+            'Kategori Program': payload['Kategori Program'],
+            'Tahun Pelaksanaan': payload['Tahun Pelaksanaan'],
+            'Kata Kunci': payload['Kata Kunci']
+          };
+          const fallbackRes = await supabase.from('Karya Inovasi').insert([fallbackPayload]).select();
+          error = fallbackRes.error;
+        }
+
+        if (error) {
+          alert('Gagal menyimpan ke Supabase:\n' + error.message + '\n\nPeriksa apakah RLS Policy sudah diaktifkan.');
+        } else {
+          document.getElementById('form-inovasi').reset();
+          fetchKaryaInovasi(); // Refresh data otomatis
+        }
+      } catch (err) {
+        alert('Eror: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Simpan ke Supabase (Tabel Karya Inovasi)';
+      }
+    });
+
+    // 7. Fungsi Hapus Data Karya Inovasi
+    async function hapusInovasi(id) {
+      if (!confirm('Hapus data karya inovasi ini dari Supabase?')) return;
+      const { error } = await supabase.from('Karya Inovasi').delete().eq('id', id);
+      if (error) {
+        alert('Gagal menghapus: ' + error.message);
+      } else {
+        fetchKaryaInovasi();
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      })[m]);
+    }
+
+    // 8. Panggil Otomatis Saat Halaman Pertama Kali Dibuka
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchPublikasi();
+      fetchKaryaInovasi();
+    });
+  </script>
+</body>
+</html>

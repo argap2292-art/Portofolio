@@ -512,7 +512,7 @@ export const PortfolioSection: React.FC<PortfolioSectionProps> = ({
                         {/* Tags */}
                         <div>
                           <div className="flex flex-wrap gap-1.5 mb-4">
-                            {item.tags.map((tag, tIdx) => (
+                            {(item.tags || []).map((tag, tIdx) => (
                               <span
                                 key={tIdx}
                                 className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-white/10 text-slate-200"
