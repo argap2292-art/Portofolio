@@ -5,14 +5,12 @@ interface NavbarProps {
   activeSection: string;
   onNavigate: (sectionId: string) => void;
   onOpenContact: () => void;
-  onOpenPhotoManager: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeSection,
   onNavigate,
   onOpenContact,
-  onOpenPhotoManager,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -41,7 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div className="flex flex-col">
             <span className="text-base font-bold tracking-tight text-slate-900 whitespace-nowrap group-hover:text-emerald-700 transition-colors">
-              Arga Putra Pratama, <span className="font-serif-display font-semibold text-emerald-700">M.Pd.</span>
+              Arga Putra Pratama
             </span>
             <span className="text-[11px] font-medium text-slate-500 whitespace-nowrap">
               Pendidik & Praktisi PAI Ponorogo
@@ -71,15 +69,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Zone 3: Primary Action */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <button
-            onClick={onOpenPhotoManager}
-            title="Kelola & Sesuaikan Foto Galeri"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors whitespace-nowrap"
-          >
-            <ImageIcon className="h-3.5 w-3.5 text-slate-600" />
-            <span>Foto Galeri</span>
-          </button>
-
           <button
             onClick={onOpenContact}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 rounded-lg shadow-xs transition-all whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
@@ -121,16 +110,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               );
             })}
             <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
-              <button
-                onClick={() => {
-                  onOpenPhotoManager();
-                  setMobileMenuOpen(false);
-                }}
-                className="flex items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg"
-              >
-                <ImageIcon className="h-4 w-4 text-slate-500" />
-                <span>Lihat / Kelola Foto Asli</span>
-              </button>
               <button
                 onClick={() => {
                   onOpenContact();

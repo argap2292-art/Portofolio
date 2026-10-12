@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ProfileData } from '../types';
 import { 
   MapPin, 
@@ -16,8 +16,11 @@ import {
   Eye, 
   FileText,
   Upload,
-  RefreshCw
+  RefreshCw,
+  Camera,
+  Image as ImageIcon
 } from 'lucide-react';
+import { ChangeProfilePhotoModal } from './ChangeProfilePhotoModal';
 
 interface ProfileSectionProps {
   profile: ProfileData;
@@ -36,6 +39,8 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
   onNavigateToPortfolio,
   onUpdatePhoto,
 }) => {
+  const [isPhotoChangerOpen, setIsPhotoChangerOpen] = useState(false);
+
   const handleLocalUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && onUpdatePhoto) {
@@ -88,6 +93,17 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                   {/* Subtle lower gradient overlay for name ribbon */}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-90" />
                   
+                  {/* Action Button: Ganti Foto Profil */}
+                  <button
+                    onClick={() => setIsPhotoChangerOpen(true)}
+                    className="absolute top-4 left-4 py-2 px-3 rounded-xl bg-emerald-700/95 hover:bg-emerald-600 text-white backdrop-blur-md transition-all shadow-md hover:scale-105 flex items-center gap-1.5 text-xs font-semibold"
+                    title="Ganti Foto Profil (Perangkat / Kamera / Link)"
+                    aria-label="Ganti Foto Profil"
+                  >
+                    <Camera className="h-4 w-4" />
+                    <span>Ganti Foto</span>
+                  </button>
+
                   {/* Floating Action Button to view Fullscreen */}
                   <button
                     onClick={() => onOpenLightbox(photoProfilSaya, `${profile.fullName}, ${profile.titleDegree}`, 'Foto profil resmi pendidik dalam balutan seragam PGRI dan peci nasional.')}
@@ -124,6 +140,15 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                 {/* Direct Upload & Switcher toolbar */}
                 {onUpdatePhoto && (
                   <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-col gap-2">
+                    {/* Primary Button to Open Full Photo Modal */}
+                    <button
+                      onClick={() => setIsPhotoChangerOpen(true)}
+                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-all"
+                    >
+                      <Camera className="h-4 w-4" />
+                      <span>Ganti Foto (Perangkat / Kamera / Link)</span>
+                    </button>
+
                     <div className="flex items-center justify-between gap-1.5 text-[11px]">
                       <span className="text-slate-500">Pilihan Foto Presisi:</span>
                       <div className="flex items-center gap-1">
@@ -144,9 +169,9 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                       </div>
                     </div>
 
-                    <label className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-medium cursor-pointer transition-colors">
-                      <Upload className="h-3.5 w-3.5" />
-                      <span>Ganti dengan File PNG/JPG Sendiri</span>
+                    <label className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer transition-colors">
+                      <Upload className="h-3.5 w-3.5 text-slate-600" />
+                      <span>Pilih File Langsung dari Galeri HP/PC</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -318,6 +343,19 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
         </div>
 
       </div>
+
+      {/* MODAL GANTI FOTO PROFIL */}
+      <ChangeProfilePhotoModal
+        isOpen={isPhotoChangerOpen}
+        currentPhotoUrl={photoProfilSaya}
+        onSelectPhoto={(newUrl) => {
+          if (onUpdatePhoto) onUpdatePhoto(newUrl);
+        }}
+        onResetDefault={() => {
+          if (onUpdatePhoto) onUpdatePhoto('/images/profil-resmi.jpg');
+        }}
+        onClose={() => setIsPhotoChangerOpen(false)}
+      />
     </section>
   );
 };

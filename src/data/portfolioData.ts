@@ -138,88 +138,9 @@ export const INITIAL_ORGANIZATIONS: OrganizationItem[] = [
   },
 ];
 
-export const INITIAL_INNOVATIONS: InnovationItem[] = [
-  {
-    id: 'inv-1',
-    title: 'Pembelajaran Interaktif PAI Berbasis Smart Screen TV',
-    category: 'media_digital',
-    year: '2024',
-    description: 'Penerapan panel layar pintar interaktif dalam pembelajaran materi tata surya, rukun Islam, dan kisah teladan. Siswa dapat menyentuh langsung elemen visual, menjawab kuis interaktif, dan berpartisipasi aktif tanpa rasa jenuh.',
-    tags: ['Interactive Display', 'Kurikulum Merdeka', 'Digital Pedagogi', 'PAI Sekolah Dasar'],
-    imageUrl: '/images/gambar-4.jpg',
-  },
-  {
-    id: 'inv-2',
-    title: 'Eksplorasi Budaya & Karakter Islami Lewat Seni Hadrah Rebana',
-    category: 'ekstrakurikuler',
-    year: '2023 - Sekarang',
-    description: 'Program pembiasaan seni musik Islam rebana untuk menumbuhkan rasa percaya diri, ketukan ritmis shalawat, serta memperkuat kebersamaan antar siswa dalam bingkai nilai-nilai religius.',
-    tags: ['Seni Rebana', 'Pendidikan Karakter', 'Hadrah', 'Pramuka Berbudaya'],
-    imageUrl: '/images/gambar-3.jpg',
-  },
-  {
-    id: 'inv-3',
-    title: 'Pembinaan Prestasi & Lomba Pengucap Doa Siaga Pramuka',
-    category: 'karakter',
-    year: '2024',
-    description: 'Program akselerasi latihan kecakapan baris-berbaris dan pengucapan doa harian untuk regu Siaga, berhasil mengantarkan peserta didik meraih piala prestasi Siaga di Kwartir Ranting Mlarak.',
-    tags: ['Pramuka Siaga', 'Kecakapan Doa', 'Prestasi Kwarran', 'Keteladanan'],
-    imageUrl: '/images/gambar-1.jpg',
-  },
-  {
-    id: 'inv-4',
-    title: 'Modul Ajar Pembelajaran Berdiferensiasi PAI Kelas Rendah',
-    category: 'modul_ajar',
-    year: '2024',
-    description: 'Modul digital berbasis lembar kerja visual dan audio interaktif yang disesuaikan dengan gaya belajar kinestetik, visual, dan auditori siswa sekolah dasar.',
-    tags: ['Modul Ajar', 'Diferensiasi', 'Kearifan Lokal', 'Kurikulum Merdeka'],
-    imageUrl: '/images/gambar-2.jpg',
-  },
-];
+export const INITIAL_INNOVATIONS: InnovationItem[] = [];
 
-export const INITIAL_PUBLICATIONS: PublicationItem[] = [
-  {
-    id: 'pub-1',
-    title: 'Inovasi Media Pembelajaran Interaktif Berbasis Digital dalam Penguatan Pendidikan Karakter Peserta Didik di Sekolah Dasar',
-    type: 'Tesis',
-    publisherOrInstitution: 'Program Pascasarjana Magister PAI, UIN Ponorogo',
-    year: '2025',
-    abstract: 'Tesis ini mengkaji pengaruh integrasi smart display dan konten interaktif dalam menanamkan nilai-nilai religius dan kedisiplinan peserta didik di era transformasi digital di sekolah dasar binaan Kabupaten Ponorogo.',
-    tags: ['Tesis Magister', 'Smart Board', 'Pendidikan Karakter', 'UIN Ponorogo'],
-    externalUrl: 'https://etheses.iainponorogo.ac.id/',
-  },
-  {
-    id: 'pub-2',
-    title: 'Integrasi Nilai Kepramukaan dan Pendidikan Agama Islam dalam Membentuk Karakter Mandiri Anak Usia Dasar',
-    type: 'Jurnal',
-    publisherOrInstitution: 'Jurnal Tarbiyah & Kependidikan Islam Nusantara',
-    year: '2024',
-    doiOrIssn: 'ISSN 2745-9821',
-    abstract: 'Penelitian kualitatif yang menguraikan keselarasan Dwisatya Pramuka Siaga dengan nilai akhlak terpuji Islam, terbukti secara empiris meningkatkan kemandirian dan rasa empati peserta didik.',
-    tags: ['Jurnal Ilmiah', 'Kepramukaan', 'Karakter Mandiri', 'Peer-Reviewed'],
-    externalUrl: 'https://journal.ponorogo-edu.or.id/',
-  },
-  {
-    id: 'pub-3',
-    title: 'Optimalisasi Pembelajaran Aktif Berbantuan Media Visual Interaktif untuk Meningkatkan Motivasi Belajar Siswa PAI',
-    type: 'Prosiding',
-    publisherOrInstitution: 'Prosiding Seminar Nasional KKG & Pendidikan Dasar Jawa Timur',
-    year: '2024',
-    abstract: 'Kajian empiris pelaksanaan pembelajaran aktif di Kecamatan Mlarak yang memadukan presentasi visual sentuh dengan simulasi kelompok kecil, meningkatkan ketuntasan belajar secara signifikan.',
-    tags: ['Prosiding', 'Seminar Nasional', 'KKG PAI Mlarak', 'Pedagogi Aktif'],
-    externalUrl: 'https://seminar.pendidikan.id/',
-  },
-  {
-    id: 'pub-4',
-    title: 'Studi Efektivitas Pembelajaran Pendidikan Agama Islam Berbasis Nilai-Nilai Religius di Lingkungan Sekolah Dasar',
-    type: 'Skripsi',
-    publisherOrInstitution: 'Fakultas Tarbiyah dan Ilmu Keguruan, UIN Ponorogo',
-    year: '2023',
-    abstract: 'Karya ilmiah sarjana yang meneliti pola habituasi ibadah harian dan keteladanan guru dalam pembentukan religiusitas siswa di lingkungan pendidikan dasar Ponorogo.',
-    tags: ['Skripsi S-1', 'Religiusitas', 'Pendidikan Dasar', 'UIN Ponorogo'],
-    externalUrl: 'https://repository.iainponorogo.ac.id/',
-  },
-];
+export const INITIAL_PUBLICATIONS: PublicationItem[] = [];
 
 export const DEFAULT_PHOTOS = {
   gambar1: '/images/gambar-1.jpg', // Prestasi Siaga Pramuka Kwarran

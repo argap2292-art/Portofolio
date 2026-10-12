@@ -12,7 +12,6 @@ import { PublicationSection } from './components/PublicationSection';
 import { Footer } from './components/Footer';
 import { ImageLightboxModal } from './components/ImageLightboxModal';
 import { ContactModal } from './components/ContactModal';
-import { PhotoManagerModal } from './components/PhotoManagerModal';
 import { 
   INITIAL_PROFILE, 
   INITIAL_EDUCATION, 
@@ -39,28 +38,34 @@ export default function App() {
     return DEFAULT_PHOTOS;
   });
 
-  // Innovations list state
+  // Innovations list state (strictly starts empty, user can upload/add)
   const [innovations, setInnovations] = useState<InnovationItem[]>(() => {
-    const saved = localStorage.getItem('arga_portfolio_innovations');
-    if (saved) {
-      try {
+    // Clear old mock caches
+    try {
+      localStorage.removeItem('arga_portfolio_innovations');
+      localStorage.removeItem('arga_portfolio_innovations_v2');
+      const saved = localStorage.getItem('arga_portfolio_innovations_empty_v1');
+      if (saved) {
         return JSON.parse(saved);
-      } catch {
-        return INITIAL_INNOVATIONS;
       }
+    } catch {
+      return INITIAL_INNOVATIONS;
     }
     return INITIAL_INNOVATIONS;
   });
 
-  // Publications list state
+  // Publications list state (strictly starts empty, user can add/attach)
   const [publications, setPublications] = useState<PublicationItem[]>(() => {
-    const saved = localStorage.getItem('arga_portfolio_publications');
-    if (saved) {
-      try {
+    // Clear old mock caches
+    try {
+      localStorage.removeItem('arga_portfolio_publications');
+      localStorage.removeItem('arga_portfolio_publications_v2');
+      const saved = localStorage.getItem('arga_portfolio_publications_empty_v1');
+      if (saved) {
         return JSON.parse(saved);
-      } catch {
-        return INITIAL_PUBLICATIONS;
       }
+    } catch {
+      return INITIAL_PUBLICATIONS;
     }
     return INITIAL_PUBLICATIONS;
   });
@@ -79,7 +84,6 @@ export default function App() {
   });
 
   const [isContactOpen, setIsContactOpen] = useState(false);
-  const [isPhotoManagerOpen, setIsPhotoManagerOpen] = useState(false);
 
   // Sync photos to LocalStorage
   const handleUpdatePhoto = (
@@ -98,7 +102,7 @@ export default function App() {
     localStorage.removeItem('arga_portfolio_photos_v2');
   };
 
-  // Add Innovation handler
+  // Add & Delete Innovation handlers
   const handleAddInnovation = (item: Omit<InnovationItem, 'id'>) => {
     const newItem: InnovationItem = {
       ...item,
@@ -106,12 +110,20 @@ export default function App() {
     };
     setInnovations((prev) => {
       const updated = [newItem, ...prev];
-      localStorage.setItem('arga_portfolio_innovations', JSON.stringify(updated));
+      localStorage.setItem('arga_portfolio_innovations_empty_v1', JSON.stringify(updated));
       return updated;
     });
   };
 
-  // Add Publication handler
+  const handleDeleteInnovation = (id: string) => {
+    setInnovations((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
+      localStorage.setItem('arga_portfolio_innovations_empty_v1', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Add & Delete Publication handlers
   const handleAddPublication = (item: Omit<PublicationItem, 'id'>) => {
     const newItem: PublicationItem = {
       ...item,
@@ -119,7 +131,15 @@ export default function App() {
     };
     setPublications((prev) => {
       const updated = [newItem, ...prev];
-      localStorage.setItem('arga_portfolio_publications', JSON.stringify(updated));
+      localStorage.setItem('arga_portfolio_publications_empty_v1', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleDeletePublication = (id: string) => {
+    setPublications((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
+      localStorage.setItem('arga_portfolio_publications_empty_v1', JSON.stringify(updated));
       return updated;
     });
   };
@@ -177,7 +197,6 @@ export default function App() {
         activeSection={activeSection}
         onNavigate={handleNavigate}
         onOpenContact={() => setIsContactOpen(true)}
-        onOpenPhotoManager={() => setIsPhotoManagerOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -209,12 +228,14 @@ export default function App() {
           photoGambar4={photos.gambar4}
           onOpenLightbox={handleOpenLightbox}
           onAddInnovation={handleAddInnovation}
+          onDeleteInnovation={handleDeleteInnovation}
         />
 
         {/* 4. Halaman / Bagian Publikasi: Tesis S-2, Jurnal, Skripsi, Prosiding, & Space Interaktif */}
         <PublicationSection
           publications={publications}
           onAddPublication={handleAddPublication}
+          onDeletePublication={handleDeletePublication}
         />
       </main>
 
@@ -237,15 +258,6 @@ export default function App() {
         isOpen={isContactOpen}
         profile={INITIAL_PROFILE}
         onClose={() => setIsContactOpen(false)}
-      />
-
-      <PhotoManagerModal
-        isOpen={isPhotoManagerOpen}
-        photos={photos}
-        onUpdatePhoto={handleUpdatePhoto}
-        onResetPhotos={handleResetPhotos}
-        onClose={() => setIsPhotoManagerOpen(false)}
-        onOpenLightbox={handleOpenLightbox}
       />
     </div>
   );

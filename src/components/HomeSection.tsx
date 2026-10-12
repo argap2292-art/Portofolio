@@ -76,7 +76,7 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs text-emerald-200">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            <span>Portofolio Pendidik & Magister PAI Ponorogo</span>
+            <span>Portofolio Pendidik PAI Ponorogo</span>
           </div>
 
           {/* Visual Blend Switcher */}
@@ -116,7 +116,7 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
               Hai, namaku <span className="text-emerald-400 font-serif-display italic">Arga</span>.
             </h1>
             <p className="text-lg sm:text-xl font-medium text-slate-300">
-              Arga Putra Pratama, <span className="text-emerald-300 font-serif-display">M.Pd.</span>
+              Arga Putra Pratama
             </p>
           </div>
 
@@ -215,7 +215,7 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
             <div className="flex items-center justify-between text-xs text-amber-300 font-medium mb-1.5">
               <span className="flex items-center gap-1.5">
                 <BookOpen className="h-3.5 w-3.5" />
-                <span>Akademisi Magister (M.Pd.)</span>
+                <span>Pendidikan Agama Islam</span>
               </span>
               <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-white transition-transform group-hover:translate-x-0.5" />
             </div>
