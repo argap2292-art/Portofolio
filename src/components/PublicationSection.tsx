@@ -13,19 +13,27 @@ import {
   Sparkles,
   Bookmark,
   Share2,
-  Trash2
+  Trash2,
+  Loader2,
+  UploadCloud,
+  AlertCircle
 } from 'lucide-react';
 
 interface PublicationSectionProps {
   publications: PublicationItem[];
-  onAddPublication: (item: Omit<PublicationItem, 'id'>) => void;
+  onAddPublication: (
+    item: Omit<PublicationItem, 'id'>,
+    file?: File | null
+  ) => Promise<{ success: boolean; error?: string; storageWarning?: string | null }>;
   onDeletePublication?: (id: string) => void;
+  onOpenSupabaseStatus?: () => void;
 }
 
 export const PublicationSection: React.FC<PublicationSectionProps> = ({
   publications,
   onAddPublication,
   onDeletePublication,
+  onOpenSupabaseStatus,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
@@ -42,55 +50,73 @@ export const PublicationSection: React.FC<PublicationSectionProps> = ({
   const [newLink, setNewLink] = useState('');
   const [newDoi, setNewDoi] = useState('');
   const [newTags, setNewTags] = useState('');
-  const [uploadedFileName, setUploadedFileName] = useState('');
-  const [uploadedFileDataUrl, setUploadedFileDataUrl] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setUploadedFileName(file.name);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setUploadedFileDataUrl(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+    const file = e.target.files?.[0] || null;
+    setSelectedFile(file);
+    setFormError(null);
   };
 
-  const handleSubmitNew = (e: React.FormEvent) => {
+  const handleClearFile = () => {
+    setSelectedFile(null);
+  };
+
+  const handleSubmitNew = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
+
+    setIsSubmitting(true);
+    setFormError(null);
+    setSubmitStatus(
+      selectedFile
+        ? 'Mengunggah file PDF ke Supabase Storage ("berkas-publikasi") & menyimpan data...'
+        : 'Menyimpan data publikasi ke Supabase...'
+    );
 
     const tagsArray = newTags
       .split(',')
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
 
-    onAddPublication({
-      title: newTitle.trim(),
-      type: newType,
-      publisherOrInstitution: newPublisher.trim() || 'UIN Ponorogo',
-      year: newYear.trim() || '2025',
-      abstract: newAbstract.trim() || 'Karya tulis ilmiah dalam bidang Pendidikan Agama Islam.',
-      externalUrl: newLink.trim() || undefined,
-      fileUrl: uploadedFileDataUrl || undefined,
-      doiOrIssn: newDoi.trim() || undefined,
-      tags: tagsArray.length > 0 ? tagsArray : ['PAI', 'Karya Ilmiah'],
-    });
+    try {
+      const res = await onAddPublication(
+        {
+          title: newTitle.trim(),
+          type: newType,
+          publisherOrInstitution: newPublisher.trim() || 'UIN Ponorogo',
+          year: newYear.trim() || '2025',
+          abstract: newAbstract.trim() || 'Karya tulis ilmiah dalam bidang Pendidikan Agama Islam.',
+          externalUrl: newLink.trim() || undefined,
+          doiOrIssn: newDoi.trim() || undefined,
+          tags: tagsArray.length > 0 ? tagsArray : ['PAI', 'Karya Ilmiah'],
+        },
+        selectedFile
+      );
 
-    // Reset
-    setNewTitle('');
-    setNewPublisher('');
-    setNewYear('2025');
-    setNewAbstract('');
-    setNewLink('');
-    setNewDoi('');
-    setNewTags('');
-    setUploadedFileName('');
-    setUploadedFileDataUrl('');
-    setIsAddModalOpen(false);
+      if (res && !res.success) {
+        setFormError(res.error || 'Gagal menyimpan ke Supabase');
+      } else {
+        // Reset
+        setNewTitle('');
+        setNewPublisher('');
+        setNewYear('2025');
+        setNewAbstract('');
+        setNewLink('');
+        setNewDoi('');
+        setNewTags('');
+        setSelectedFile(null);
+        setIsAddModalOpen(false);
+      }
+    } catch (err: any) {
+      setFormError(err.message || 'Terjadi kesalahan sistem');
+    } finally {
+      setIsSubmitting(false);
+      setSubmitStatus(null);
+    }
   };
 
   const handleCopyCitation = (pub: PublicationItem) => {
@@ -562,34 +588,98 @@ export const PublicationSection: React.FC<PublicationSectionProps> = ({
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Lampirkan File Dokumen / PDF (Opsional)
+                  Lampirkan Berkas PDF (Unggah ke Supabase Storage "berkas-publikasi")
                 </label>
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={handleFileUpload}
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-800 file:text-white file:text-xs hover:file:bg-slate-700 cursor-pointer"
-                />
-                {uploadedFileName && (
-                  <p className="text-xs text-emerald-700 mt-1 font-medium">
-                    ✓ File dipilih: {uploadedFileName}
-                  </p>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={handleFileUpload}
+                    disabled={isSubmitting}
+                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:bg-slate-900 file:text-white file:text-xs hover:file:bg-slate-800 cursor-pointer disabled:opacity-50"
+                  />
+                </div>
+                {selectedFile && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 text-emerald-800 truncate mr-2">
+                      <FileText className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span className="font-medium truncate">{selectedFile.name}</span>
+                      <span className="text-[11px] text-emerald-600 shrink-0">
+                        ({(selectedFile.size / 1024).toFixed(1)} KB)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClearFile}
+                      disabled={isSubmitting}
+                      className="text-slate-400 hover:text-rose-600 p-1 rounded font-bold"
+                      title="Batalkan pilihan file"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 )}
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Format didukung: Dokumen PDF (.pdf). File akan diunggah ke bucket storage Supabase dan tautan publiknya otomatis disimpan ke kolom <code>'Tautan File'</code>.
+                </p>
               </div>
+
+              {/* Status Message while Submitting */}
+              {submitStatus && (
+                <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs flex items-center gap-2.5 animate-pulse">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-600 shrink-0" />
+                  <span>{submitStatus}</span>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {formError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1.5">
+                  <div className="font-semibold flex items-center gap-1.5">
+                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                    <span>Gagal Menyimpan ke Supabase</span>
+                  </div>
+                  <p className="leading-relaxed">{formError}</p>
+                  {onOpenSupabaseStatus && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddModalOpen(false);
+                        onOpenSupabaseStatus();
+                      }}
+                      className="inline-flex items-center gap-1 text-xs text-emerald-700 font-semibold underline hover:text-emerald-800 mt-1"
+                    >
+                      Buka Panduan SQL & Konfigurasi Supabase
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium shadow-sm"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm disabled:opacity-60 transition-all cursor-pointer"
                 >
-                  Simpan Publikasi
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Sedang Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="h-4 w-4" />
+                      <span>Simpan ke Supabase</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

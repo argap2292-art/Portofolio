@@ -5,6 +5,8 @@ export const SUPABASE_URL = 'https://xnlckffyduujdidvvrtj.supabase.co';
 export const SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhubGNrZmZ5ZHV1amRpZHZ2cnRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4Mjg5NzIsImV4cCI6MjEwNzQwNDk3Mn0.8LLx590UrhfyeuJ34Ph-MdM99dNO54bLq8GklpvA-7g';
 
+export const BUCKET_BERKAS_PUBLIKASI = 'berkas-publikasi';
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: false,
@@ -20,7 +22,64 @@ export interface SupabaseSyncStatus {
 }
 
 // ---------------------------------------------------------------------------
-// 1. PUBLIKASI FUNCTIONS
+// 1. SUPABASE STORAGE: UNGGAH FILE PDF KE BUCKET "berkas-publikasi"
+// ---------------------------------------------------------------------------
+
+export async function uploadPublicationPdf(
+  file: File
+): Promise<{
+  url: string | null;
+  error: Error | null;
+  needsRlsFix?: boolean;
+  bucketNotFound?: boolean;
+}> {
+  try {
+    const ext = file.name.split('.').pop() || 'pdf';
+    const cleanBaseName = file.name
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 40);
+    const fileName = `${Date.now()}_${cleanBaseName}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from(BUCKET_BERKAS_PUBLIKASI)
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || 'application/pdf',
+      });
+
+    if (error) {
+      console.warn('[Supabase Storage] Gagal upload:', error.message);
+      const isBucketNotFound =
+        error.message?.includes('Bucket not found') ||
+        (error as any).statusCode === '404' ||
+        (error as any).code === 'NoSuchBucket';
+      const isRls =
+        error.message?.includes('violates row-level security') ||
+        (error as any).statusCode === '403' ||
+        (error as any).code === 'AccessDenied';
+
+      return {
+        url: null,
+        error: new Error(error.message),
+        bucketNotFound: isBucketNotFound,
+        needsRlsFix: isRls,
+      };
+    }
+
+    const { data: pubData } = supabase.storage
+      .from(BUCKET_BERKAS_PUBLIKASI)
+      .getPublicUrl(fileName);
+
+    return { url: pubData.publicUrl, error: null };
+  } catch (err: any) {
+    return { url: null, error: err };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 2. PUBLIKASI FUNCTIONS
 // ---------------------------------------------------------------------------
 
 export async function fetchPublicationsFromSupabase(): Promise<{
@@ -74,33 +133,56 @@ export async function fetchPublicationsFromSupabase(): Promise<{
 }
 
 export async function insertPublicationToSupabase(
-  item: Omit<PublicationItem, 'id'>
-): Promise<{ data: PublicationItem | null; error: Error | null; needsRlsFix?: boolean }> {
+  item: Omit<PublicationItem, 'id'>,
+  file?: File | null
+): Promise<{
+  data: PublicationItem | null;
+  error: Error | null;
+  needsRlsFix?: boolean;
+  storageWarning?: string | null;
+}> {
   try {
+    let finalFileUrl = item.fileUrl || item.externalUrl || '';
+    let storageWarning: string | null = null;
+
+    // 1. Jika ada file PDF yang dipilih, unggah ke Supabase Storage terlebih dahulu
+    if (file) {
+      const uploadRes = await uploadPublicationPdf(file);
+      if (uploadRes.error) {
+        console.warn('[Supabase Storage] Gagal mengunggah file PDF:', uploadRes.error.message);
+        storageWarning = uploadRes.bucketNotFound
+          ? `Bucket '${BUCKET_BERKAS_PUBLIKASI}' belum dibuat di Supabase Storage.`
+          : `Gagal mengunggah file ke Storage: ${uploadRes.error.message}`;
+      } else if (uploadRes.url) {
+        finalFileUrl = uploadRes.url;
+      }
+    }
+
+    // 2. Siapkan data baris baru sesuai struktur kolom tabel "Publikasi"
     const payloadFull: Record<string, any> = {
       Judul: item.title,
       'Jenis Karya': item.type,
       'Tahun Terbit': item.year,
       Penerbit: item.publisherOrInstitution,
-      'Tautan File': item.fileUrl || item.externalUrl || '',
+      'Tautan File': finalFileUrl,
       'Nomor ISBN/DOI': item.doiOrIssn || '',
       Abstrak: item.abstract || '',
     };
 
-    // Try full insert first
+    // 3. Simpan baris baru ke Supabase
     let res = await supabase.from('Publikasi').insert([payloadFull]).select();
 
-    // If column Abstrak or Nomor ISBN/DOI doesn't exist yet in the database schema, fallback to base columns
+    // Fallback jika kolom Abstrak atau Nomor ISBN/DOI belum ada di schema cache
     if (res.error && res.error.message.includes('in the schema cache')) {
       console.info(
-        '[Supabase] Kolom Abstrak/ISBN belum ada di tabel, menyimpan dengan kolom dasar...'
+        '[Supabase] Kolom Abstrak/ISBN belum ada di schema cache, menyimpan dengan kolom dasar...'
       );
       const payloadBase: Record<string, any> = {
         Judul: item.title,
         'Jenis Karya': item.type,
         'Tahun Terbit': item.year,
         Penerbit: item.publisherOrInstitution,
-        'Tautan File': item.fileUrl || item.externalUrl || '',
+        'Tautan File': finalFileUrl,
       };
       res = await supabase.from('Publikasi').insert([payloadBase]).select();
     }
@@ -111,6 +193,7 @@ export async function insertPublicationToSupabase(
         data: null,
         error: new Error(res.error.message),
         needsRlsFix: res.error.code === '42501',
+        storageWarning,
       };
     }
 
@@ -118,9 +201,11 @@ export async function insertPublicationToSupabase(
     const createdItem: PublicationItem = {
       ...item,
       id: insertedRow ? String(insertedRow.id) : `pub-${Date.now()}`,
+      fileUrl: finalFileUrl || undefined,
+      externalUrl: finalFileUrl || item.externalUrl || undefined,
     };
 
-    return { data: createdItem, error: null };
+    return { data: createdItem, error: null, storageWarning };
   } catch (err: any) {
     return { data: null, error: err };
   }
@@ -147,7 +232,7 @@ export async function deletePublicationFromSupabase(
 }
 
 // ---------------------------------------------------------------------------
-// 2. KARYA INOVASI FUNCTIONS
+// 3. KARYA INOVASI FUNCTIONS
 // ---------------------------------------------------------------------------
 
 export async function fetchInnovationsFromSupabase(): Promise<{
@@ -186,9 +271,13 @@ export async function fetchInnovationsFromSupabase(): Promise<{
       }
 
       const tagsRaw = row['Kata Kunci'] || '';
-      const tagsArray = typeof tagsRaw === 'string'
-        ? tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean)
-        : [];
+      const tagsArray =
+        typeof tagsRaw === 'string'
+          ? tagsRaw
+              .split(',')
+              .map((t: string) => t.trim())
+              .filter(Boolean)
+          : [];
 
       const extLink = row['Tautan Eksternal/Dok'] || '';
 

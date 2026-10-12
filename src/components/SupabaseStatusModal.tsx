@@ -45,7 +45,20 @@ CREATE POLICY "Akses Publik Publikasi" ON "Publikasi"
 ALTER TABLE "Karya Inovasi" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Akses Publik Karya Inovasi" ON "Karya Inovasi";
 CREATE POLICY "Akses Publik Karya Inovasi" ON "Karya Inovasi"
-  FOR ALL TO anon USING (true) WITH CHECK (true);`;
+  FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- 3. Konfigurasi Supabase Storage Bucket "berkas-publikasi" untuk File PDF
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('berkas-publikasi', 'berkas-publikasi', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Akses Publik Berkas Publikasi" ON storage.objects;
+CREATE POLICY "Akses Publik Berkas Publikasi" ON storage.objects
+  FOR SELECT TO anon USING (bucket_id = 'berkas-publikasi');
+
+DROP POLICY IF EXISTS "Upload Publik Berkas Publikasi" ON storage.objects;
+CREATE POLICY "Upload Publik Berkas Publikasi" ON storage.objects
+  FOR INSERT TO anon WITH CHECK (bucket_id = 'berkas-publikasi');`;
 
   const handleCopySql = () => {
     navigator.clipboard.writeText(sqlScript);

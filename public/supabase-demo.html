@@ -33,16 +33,28 @@
         Jika Anda mengalami pesan eror <code class="bg-black/30 px-1.5 py-0.5 rounded text-amber-200">new row violates row-level security policy</code> saat menyimpan data, pastikan Anda telah mengaktifkan Policy akses publik di Supabase SQL Editor dengan menjalankan perintah berikut:
       </p>
       <pre class="mt-3 p-3 rounded-xl bg-slate-950 text-emerald-300 text-xs overflow-x-auto font-mono">
--- Tambahkan kolom yang belum ada (jika belum dibuat)
+-- 1. Tambahkan kolom yang belum ada (jika belum dibuat)
 ALTER TABLE "Publikasi" ADD COLUMN IF NOT EXISTS "Nomor ISBN/DOI" text, ADD COLUMN IF NOT EXISTS "Abstrak" text;
 ALTER TABLE "Karya Inovasi" ADD COLUMN IF NOT EXISTS "Deskripsi Lengkap" text, ADD COLUMN IF NOT EXISTS "Tautan Eksternal/Dok" text;
 
--- Izinkan akses baca dan tulis untuk anonim
+-- 2. Izinkan akses baca dan tulis untuk anonim (RLS)
 ALTER TABLE "Publikasi" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Akses Publik Publikasi" ON "Publikasi";
 CREATE POLICY "Akses Publik Publikasi" ON "Publikasi" FOR ALL TO anon USING (true) WITH CHECK (true);
 
 ALTER TABLE "Karya Inovasi" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Akses Publik Karya Inovasi" ON "Karya Inovasi" FOR ALL TO anon USING (true) WITH CHECK (true);</pre>
+DROP POLICY IF EXISTS "Akses Publik Karya Inovasi" ON "Karya Inovasi";
+CREATE POLICY "Akses Publik Karya Inovasi" ON "Karya Inovasi" FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- 3. Konfigurasi Bucket Storage "berkas-publikasi" untuk File PDF
+INSERT INTO storage.buckets (id, name, public) VALUES ('berkas-publikasi', 'berkas-publikasi', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Akses Publik Berkas Publikasi" ON storage.objects;
+CREATE POLICY "Akses Publik Berkas Publikasi" ON storage.objects FOR SELECT TO anon USING (bucket_id = 'berkas-publikasi');
+
+DROP POLICY IF EXISTS "Upload Publik Berkas Publikasi" ON storage.objects;
+CREATE POLICY "Upload Publik Berkas Publikasi" ON storage.objects FOR INSERT TO anon WITH CHECK (bucket_id = 'berkas-publikasi');</pre>
     </div>
 
     <!-- Grid 2 Kolom: Form Publikasi & Form Karya Inovasi -->
@@ -98,8 +110,14 @@ CREATE POLICY "Akses Publik Karya Inovasi" ON "Karya Inovasi" FOR ALL TO anon US
             </div>
 
             <div>
-              <label class="block text-slate-300 font-medium mb-1">Tautan File / Repositori</label>
+              <label class="block text-slate-300 font-medium mb-1">Tautan File / Repositori (Opsional)</label>
               <input type="url" id="pub-tautan" placeholder="https://etheses.uinponorogo.ac.id/..." class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Lampirkan File PDF (Upload ke Storage 'berkas-publikasi')</label>
+              <input type="file" id="pub-file" accept="application/pdf,.pdf" class="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-700 file:text-white file:text-xs hover:file:bg-slate-600 cursor-pointer">
+              <p class="text-[10px] text-slate-400 mt-1">Jika ada file PDF dipilih, file akan diunggah via <code>supabase.storage.from('berkas-publikasi').upload(...)</code>, lalu Public URL-nya otomatis disimpan ke kolom <code>'Tautan File'</code>.</p>
             </div>
 
             <button type="submit" id="btn-submit-pub" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-semibold text-white transition-colors shadow-lg">
@@ -230,24 +248,60 @@ CREATE POLICY "Akses Publik Karya Inovasi" ON "Karya Inovasi" FOR ALL TO anon US
       }
     }
 
-    // 3. Fungsi Simpan Form Input ke Tabel "Publikasi"
+    // 3. Fungsi Simpan Form Input ke Tabel "Publikasi" (dengan Upload PDF ke Storage)
     document.getElementById('form-publikasi').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('btn-submit-pub');
       btn.disabled = true;
-      btn.textContent = 'Menyimpan...';
 
-      const payload = {
-        'Judul': document.getElementById('pub-judul').value.trim(),
-        'Jenis Karya': document.getElementById('pub-jenis').value,
-        'Tahun Terbit': document.getElementById('pub-tahun').value.trim(),
-        'Penerbit': document.getElementById('pub-penerbit').value.trim() || 'UIN Ponorogo',
-        'Nomor ISBN/DOI': document.getElementById('pub-isbn').value.trim(),
-        'Abstrak': document.getElementById('pub-abstrak').value.trim(),
-        'Tautan File': document.getElementById('pub-tautan').value.trim()
-      };
+      const fileInput = document.getElementById('pub-file');
+      let tautanFile = document.getElementById('pub-tautan').value.trim();
 
       try {
+        // A. Jika ada file PDF dipilih, unggah terlebih dahulu ke Supabase Storage ('berkas-publikasi')
+        if (fileInput && fileInput.files && fileInput.files[0]) {
+          const file = fileInput.files[0];
+          btn.textContent = 'Mengunggah File PDF ke Storage...';
+
+          const fileExt = file.name.split('.').pop() || 'pdf';
+          const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 35);
+          const fileName = `${Date.now()}_${cleanName}.${fileExt}`;
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('berkas-publikasi')
+            .upload(fileName, file, {
+              cacheControl: '3600',
+              upsert: false,
+              contentType: file.type || 'application/pdf'
+            });
+
+          if (uploadError) {
+            console.warn('[Storage] Gagal mengunggah file:', uploadError.message);
+            alert('Peringatan Upload File ke Storage:\n' + uploadError.message + '\n\nPastikan bucket "berkas-publikasi" sudah dibuat di Supabase Storage dengan akses publik.');
+          } else {
+            // Dapatkan Public URL
+            const { data: publicUrlData } = supabase.storage
+              .from('berkas-publikasi')
+              .getPublicUrl(fileName);
+
+            if (publicUrlData && publicUrlData.publicUrl) {
+              tautanFile = publicUrlData.publicUrl;
+            }
+          }
+        }
+
+        btn.textContent = 'Menyimpan Baris ke Database...';
+
+        const payload = {
+          'Judul': document.getElementById('pub-judul').value.trim(),
+          'Jenis Karya': document.getElementById('pub-jenis').value,
+          'Tahun Terbit': document.getElementById('pub-tahun').value.trim(),
+          'Penerbit': document.getElementById('pub-penerbit').value.trim() || 'UIN Ponorogo',
+          'Nomor ISBN/DOI': document.getElementById('pub-isbn').value.trim(),
+          'Abstrak': document.getElementById('pub-abstrak').value.trim(),
+          'Tautan File': tautanFile
+        };
+
         let { data, error } = await supabase.from('Publikasi').insert([payload]).select();
 
         // Fallback jika kolom Abstrak/ISBN belum ditambahkan di database
@@ -267,6 +321,7 @@ CREATE POLICY "Akses Publik Karya Inovasi" ON "Karya Inovasi" FOR ALL TO anon US
           alert('Gagal menyimpan ke Supabase:\n' + error.message + '\n\nPeriksa apakah RLS Policy sudah diaktifkan.');
         } else {
           document.getElementById('form-publikasi').reset();
+          alert('Data publikasi berhasil tersimpan secara permanen ke Supabase Cloud!');
           fetchPublikasi(); // Refresh data otomatis
         }
       } catch (err) {

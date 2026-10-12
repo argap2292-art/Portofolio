@@ -240,35 +240,62 @@ export default function App() {
   // -------------------------------------------------------------------------
   // Add & Delete Publication handlers (Online to Supabase)
   // -------------------------------------------------------------------------
-  const handleAddPublication = async (item: Omit<PublicationItem, 'id'>) => {
-    const tempId = `pub-${Date.now()}`;
-    const optimisticItem: PublicationItem = { ...item, id: tempId };
+  const handleAddPublication = async (
+    item: Omit<PublicationItem, 'id'>,
+    file?: File | null
+  ): Promise<{ success: boolean; error?: string; storageWarning?: string | null }> => {
+    setIsSupabaseLoading(true);
+    setSupabaseError(null);
 
-    setPublications((prev) => {
-      const updated = [optimisticItem, ...prev];
-      localStorage.setItem('arga_portfolio_publications_empty_v1', JSON.stringify(updated));
-      return updated;
-    });
+    try {
+      showToast(
+        file
+          ? 'Mengunggah berkas PDF & menyimpan data ke Supabase...'
+          : 'Menyimpan data publikasi ke Supabase...'
+      );
 
-    showToast('Menyimpan publikasi ke Supabase...');
+      const res = await insertPublicationToSupabase(item, file);
 
-    const res = await insertPublicationToSupabase(item);
-    if (res.error) {
-      console.warn('Gagal menyimpan ke Supabase:', res.error.message);
-      if (res.needsRlsFix) {
-        setShowRlsBanner(true);
-        setIsSupabaseModalOpen(true);
+      if (res.error) {
+        console.error('[Supabase] Gagal menyimpan publikasi:', res.error);
+        const errMsg = res.error.message;
+        setSupabaseError(errMsg);
+
+        if (res.needsRlsFix) {
+          setShowRlsBanner(true);
+          setIsSupabaseModalOpen(true);
+        }
+
+        showToast(`Gagal ke Supabase: ${errMsg}`);
+        return { success: false, error: errMsg };
       }
-      showToast('Tersimpan di memori perangkat (aktifkan RLS Supabase untuk cloud)');
-    } else if (res.data) {
-      const savedItem = res.data;
-      setPublications((prev) => {
-        const updated = prev.map((pub) => (pub.id === tempId ? savedItem : pub));
-        localStorage.setItem('arga_portfolio_publications_empty_v1', JSON.stringify(updated));
-        return updated;
-      });
-      setLastSyncTime(new Date());
-      showToast('Publikasi berhasil disimpan ke Supabase Cloud!');
+
+      if (res.data) {
+        const savedItem = res.data;
+        // Update live state dengan data nyata dari Supabase
+        setPublications((prev) => [savedItem, ...prev]);
+        setLastSyncTime(new Date());
+
+        if (res.storageWarning) {
+          showToast(`Publikasi tersimpan (${res.storageWarning})`);
+        } else if (file) {
+          showToast('Berkas PDF & Publikasi berhasil disimpan ke Supabase Cloud!');
+        } else {
+          showToast('Publikasi berhasil disimpan ke Supabase Cloud!');
+        }
+
+        return {
+          success: true,
+          storageWarning: res.storageWarning,
+        };
+      }
+
+      return { success: false, error: 'Tidak ada data kembali dari Supabase' };
+    } catch (err: any) {
+      console.error('[App] Exception:', err);
+      return { success: false, error: err.message || 'Kesalahan jaringan' };
+    } finally {
+      setIsSupabaseLoading(false);
     }
   };
 
@@ -399,6 +426,7 @@ export default function App() {
           publications={publications}
           onAddPublication={handleAddPublication}
           onDeletePublication={handleDeletePublication}
+          onOpenSupabaseStatus={() => setIsSupabaseModalOpen(true)}
         />
       </main>
 
