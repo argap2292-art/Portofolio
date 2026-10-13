@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Award, BookOpen, Monitor, Sparkles, Eye, User, Compass } from 'lucide-react';
+import { ArrowRight, Award, BookOpen, Monitor, Eye } from 'lucide-react';
 
 interface HomeSectionProps {
   photoGambar1: string;
@@ -129,85 +129,14 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
 
           {/* Deskripsi Pengabdian & Peran */}
           <p className="text-base sm:text-lg text-slate-300/90 leading-relaxed max-w-2xl">
-            Guru Pendidikan Agama Islam (PAI) dan praktisi inovasi pembelajaran interaktif di Kabupaten Ponorogo. Berkomitmen membentuk generasi berakhlak mulia, tangguh, mandiri melalui penguatan karakter kepanduan dan sentuhan teknologi digital di ruang kelas.
+            Guru Pendidikan Agama Islam (PAI) dan praktisi inovasi pembelajaran interaktif. Berkomitmen membentuk generasi berakhlak mulia, tangguh, mandiri melalui penguatan karakter dan sentuhan teknologi digital di ruang kelas.
           </p>
 
-          {/* Navigation Action Buttons */}
-          <div className="pt-2 flex flex-wrap items-center gap-3 sm:gap-4">
-            <button
-              onClick={() => onNavigate('profile')}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-medium text-sm sm:text-base shadow-lg shadow-emerald-950/40 transition-all hover:translate-y-[-1px]"
-            >
-              <User className="h-4 w-4" />
-              <span>Lihat Profil Lengkap</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
-
-            <button
-              onClick={() => onNavigate('portofolio')}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 active:bg-white/5 backdrop-blur-md border border-white/20 text-white font-medium text-sm sm:text-base transition-all"
-            >
-              <Compass className="h-4 w-4 text-emerald-300" />
-              <span>Jelajahi Portofolio</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('publikasi')}
-              className="inline-flex items-center gap-2 px-4 py-3 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white text-sm sm:text-base transition-all"
-            >
-              <BookOpen className="h-4 w-4 text-emerald-300" />
-              <span>Publikasi Karya Ilmiah</span>
-            </button>
-          </div>
         </div>
 
         {/* Bottom Ambient Cards / Visual Anchors */}
         <div className="mt-14 sm:mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-white/10 pt-8">
-          {/* Card 1: Kepramukaan & Prestasi (Terkait Gambar 1) */}
-          <div
-            onClick={() => onOpenLightbox(photoGambar1, 'Pramuka Prestasi Siaga Kwarran Mlarak', 'Pembinaan kecakapan pengucap do’a & prestasi siaga berbuah trofi kejuaraan bersama peserta didik')}
-            className="group cursor-pointer p-4 rounded-2xl bg-slate-900/70 hover:bg-slate-900/90 border border-white/10 hover:border-emerald-400/40 backdrop-blur-md transition-all"
-          >
-            <div className="flex items-center justify-between text-xs text-emerald-300 font-medium mb-1.5">
-              <span className="flex items-center gap-1.5">
-                <Award className="h-3.5 w-3.5" />
-                <span>Pramuka Siaga Berprestasi</span>
-              </span>
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[11px] text-slate-300">
-                <Eye className="h-3 w-3" /> Foto 1
-              </span>
-            </div>
-            <h3 className="text-sm font-semibold text-white group-hover:text-emerald-200 transition-colors">
-              Dedikasi Kepanduan & Karakter
-            </h3>
-            <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-              Membina tunas bangsa dengan Dwisatya, pengucapan do’a harian, dan keteladanan watak mandiri.
-            </p>
-          </div>
-
-          {/* Card 2: Pembelajaran Digital Smart Display (Terkait Gambar 2) */}
-          <div
-            onClick={() => onOpenLightbox(photoGambar2, 'Pembelajaran Interaktif di Ruang Kelas', 'Pemanfaatan media smart display TV layar interaktif agar anak antusias dan terlibat aktif')}
-            className="group cursor-pointer p-4 rounded-2xl bg-slate-900/70 hover:bg-slate-900/90 border border-white/10 hover:border-emerald-400/40 backdrop-blur-md transition-all"
-          >
-            <div className="flex items-center justify-between text-xs text-teal-300 font-medium mb-1.5">
-              <span className="flex items-center gap-1.5">
-                <Monitor className="h-3.5 w-3.5" />
-                <span>Teknologi Edukasi Interaktif</span>
-              </span>
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[11px] text-slate-300">
-                <Eye className="h-3 w-3" /> Foto 2
-              </span>
-            </div>
-            <h3 className="text-sm font-semibold text-white group-hover:text-teal-200 transition-colors">
-              Inovasi Smart Display TV
-            </h3>
-            <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-              Transformasi metode mengajar konvensional menjadi petualangan visual digital yang menyenangkan.
-            </p>
-          </div>
-
-          {/* Card 3: Pendidikan Magister PAI */}
+          {/* Card 1: Pendidikan Agama Islam */}
           <div
             onClick={() => onNavigate('portofolio')}
             className="group cursor-pointer p-4 rounded-2xl bg-slate-900/70 hover:bg-slate-900/90 border border-white/10 hover:border-emerald-400/40 backdrop-blur-md transition-all"
@@ -224,6 +153,46 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
             </h3>
             <p className="text-xs text-slate-400 mt-1 line-clamp-2">
               Menuntaskan S-1 dan S-2 PAI di UIN Ponorogo (2019-2025) dengan fokus riset media pedagogi modern.
+            </p>
+          </div>
+
+          {/* Card 2: Notifikasi Hasil Publikasi */}
+          <div
+            onClick={() => onNavigate('publikasi')}
+            className="group cursor-pointer p-4 rounded-2xl bg-slate-900/70 hover:bg-slate-900/90 border border-white/10 hover:border-emerald-400/40 backdrop-blur-md transition-all"
+          >
+            <div className="flex items-center justify-between text-xs text-emerald-300 font-medium mb-1.5">
+              <span className="flex items-center gap-1.5">
+                <Award className="h-3.5 w-3.5" />
+                <span>Hasil Publikasi</span>
+              </span>
+              <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-white transition-transform group-hover:translate-x-0.5" />
+            </div>
+            <h3 className="text-sm font-semibold text-white group-hover:text-emerald-200 transition-colors">
+              Publikasi Ilmiah & Riset
+            </h3>
+            <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+              Koleksi karya tulis ilmiah, tesis, dan artikel jurnal terindeks yang dapat diunduh serta diakses online.
+            </p>
+          </div>
+
+          {/* Card 3: Notifikasi Karya Inovasi */}
+          <div
+            onClick={() => onNavigate('portofolio')}
+            className="group cursor-pointer p-4 rounded-2xl bg-slate-900/70 hover:bg-slate-900/90 border border-white/10 hover:border-emerald-400/40 backdrop-blur-md transition-all"
+          >
+            <div className="flex items-center justify-between text-xs text-teal-300 font-medium mb-1.5">
+              <span className="flex items-center gap-1.5">
+                <Monitor className="h-3.5 w-3.5" />
+                <span>Karya Inovasi</span>
+              </span>
+              <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-white transition-transform group-hover:translate-x-0.5" />
+            </div>
+            <h3 className="text-sm font-semibold text-white group-hover:text-teal-200 transition-colors">
+              Inovasi & Program Unggulan
+            </h3>
+            <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+              Transformasi media pembelajaran digital interaktif, Smart Display TV, dan pengembangan modul edukasi.
             </p>
           </div>
         </div>

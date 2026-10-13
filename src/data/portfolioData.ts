@@ -5,7 +5,7 @@ export const INITIAL_PROFILE: ProfileData = {
   titleDegree: 'M.Pd.',
   shortGreeting: 'Hai, namaku Arga.',
   mottoQuote: 'Berproses dengan ikhlas, mengabdi dengan hati, dan terus menebar manfaat.',
-  birthPlaceAndDate: 'Lahir di Kabupaten Ponorogo, Provinsi Jawa Timur',
+  birthPlaceAndDate: 'Ponorogo, 11 Januari 2001',
   currentAddress: 'Jl. Poncowolo No. 5 Kelurahan Pakunden Kecamatan Ponorogo',
   hobbies: ['Badminton', 'Bersepeda', 'Bermain game online'],
   lifeMotivationJavanese: 'dadio wong seng rumongso cukup ben ora rumongso kurang ae neng urip',
@@ -18,7 +18,7 @@ export const INITIAL_EDUCATION: EducationItem[] = [
   {
     id: 'edu-7',
     stage: 'Magister (S-2)',
-    institution: 'UIN Sunan Kalijaga / UIN Ponorogo',
+    institution: 'UIN Ponorogo',
     years: '2023 - 2025',
     degree: 'Magister Pendidikan (M.Pd.) - Pendidikan Agama Islam (PAI)',
     description: 'Fokus kajian pengembangan metodologi pembelajaran PAI interaktif berbasis teknologi digital dan penguatan karakter peserta didik.',
