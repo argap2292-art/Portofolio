@@ -19,7 +19,11 @@ import {
   Layers,
   ChevronRight,
   Filter,
-  Trash2
+  Trash2,
+  UploadCloud,
+  Loader2,
+  AlertCircle,
+  FileText
 } from 'lucide-react';
 
 interface PortfolioSectionProps {
@@ -29,8 +33,12 @@ interface PortfolioSectionProps {
   photoGambar3: string;
   photoGambar4: string;
   onOpenLightbox: (imageUrl: string, title: string, description: string) => void;
-  onAddInnovation: (item: Omit<InnovationItem, 'id'>) => void;
+  onAddInnovation: (
+    item: Omit<InnovationItem, 'id'>,
+    file?: File | null
+  ) => Promise<{ success: boolean; error?: string; storageWarning?: string | null } | void> | void;
   onDeleteInnovation?: (id: string) => void;
+  onOpenSupabaseStatus?: () => void;
 }
 
 export const PortfolioSection: React.FC<PortfolioSectionProps> = ({
@@ -42,60 +50,104 @@ export const PortfolioSection: React.FC<PortfolioSectionProps> = ({
   onOpenLightbox,
   onAddInnovation,
   onDeleteInnovation,
+  onOpenSupabaseStatus,
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'pendidikan' | 'organisasi' | 'inovasi'>('all');
   const [orgFilter, setOrgFilter] = useState<'all' | 'luar_sekolah' | 'pekerjaan'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [bgBlendMode, setBgBlendMode] = useState<'both' | 'gambar3' | 'gambar4'>('both');
 
-  // Form state for adding new innovation
+  // Form state for adding new innovation to Supabase
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState<InnovationItem['category']>('media_digital');
   const [newYear, setNewYear] = useState('2025');
   const [newDesc, setNewDesc] = useState('');
   const [newTags, setNewTags] = useState('');
   const [newLink, setNewLink] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [newImagePreview, setNewImagePreview] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<string>('');
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setNewImagePreview(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      setSelectedFile(file);
+      setFormError(null);
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            setNewImagePreview(event.target.result as string);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setNewImagePreview('');
+      }
     }
   };
 
-  const handleSubmitInnovation = (e: React.FormEvent) => {
+  const handleRemoveSelectedFile = () => {
+    setSelectedFile(null);
+    setNewImagePreview('');
+  };
+
+  const handleSubmitInnovation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim()) {
+      setFormError('Judul Karya / Program wajib diisi.');
+      return;
+    }
+
+    setFormError(null);
+    setIsSubmitting(true);
+    setSubmitStatus(
+      selectedFile
+        ? 'Mengunggah file ke Supabase Storage (berkas-inovasi)...'
+        : 'Menyimpan data ke tabel "Karya Inovasi" di Supabase...'
+    );
 
     const tagsArray = newTags
       .split(',')
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
 
-    onAddInnovation({
+    const itemPayload: Omit<InnovationItem, 'id'> = {
       title: newTitle.trim(),
       category: newCategory,
       year: newYear.trim() || '2025',
       description: newDesc.trim() || 'Karya inovasi dan program dedikasi pembelajaran.',
       tags: tagsArray.length > 0 ? tagsArray : ['Inovasi PAI', 'Karya Edukasi'],
-      imageUrl: newImagePreview || photoGambar4,
+      imageUrl: newImagePreview || undefined,
       externalLink: newLink.trim() || undefined,
-    });
+      documentUrl: newLink.trim() || undefined,
+    };
 
-    // Reset
-    setNewTitle('');
-    setNewDesc('');
-    setNewTags('');
-    setNewLink('');
-    setNewImagePreview('');
-    setIsModalOpen(false);
+    try {
+      const res = await onAddInnovation(itemPayload, selectedFile);
+      if (res && res.success === false) {
+        setFormError(res.error || 'Gagal menyimpan karya inovasi ke Supabase Cloud.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Reset modal form on success
+      setNewTitle('');
+      setNewDesc('');
+      setNewTags('');
+      setNewLink('');
+      setSelectedFile(null);
+      setNewImagePreview('');
+      setSubmitStatus('');
+      setIsModalOpen(false);
+    } catch (err: any) {
+      setFormError(err.message || 'Terjadi kesalahan saat memproses data');
+    } finally {
+      setIsSubmitting(false);
+      setSubmitStatus('');
+    }
   };
 
   const filteredOrgs = organizationList.filter((item) => {
@@ -690,36 +742,108 @@ export const PortfolioSection: React.FC<PortfolioSectionProps> = ({
                 />
               </div>
 
+              {/* Input File Dokumen / Media / Foto (Choose File) */}
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Unggah Foto Kegiatan (Opsional)
+                  Lampirkan Berkas Dokumen / Media / Foto (Opsional)
                 </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:text-white file:text-xs hover:file:bg-emerald-700 cursor-pointer"
-                />
-                {newImagePreview && (
-                  <div className="mt-2 h-24 w-full rounded-lg overflow-hidden border border-slate-700">
-                    <img src={newImagePreview} alt="Preview" className="h-full w-full object-cover" />
+                <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      disabled={isSubmitting}
+                      onChange={handleFileUpload}
+                      className="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:text-white file:text-xs hover:file:bg-emerald-500 cursor-pointer disabled:opacity-50"
+                    />
                   </div>
-                )}
+                  <p className="text-[11px] text-slate-400">
+                    File akan diunggah ke Supabase Storage bucket <code className="text-emerald-400">"berkas-inovasi"</code>, lalu Public URL-nya otomatis disimpan ke kolom database <code className="text-emerald-400">'Tautan Eksternal/Dok'</code>.
+                  </p>
+
+                  {selectedFile && (
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-950/50 border border-emerald-500/40 text-xs text-emerald-300">
+                      <div className="flex items-center gap-2 truncate">
+                        <FileText className="h-4 w-4 shrink-0 text-emerald-400" />
+                        <span className="truncate font-medium">{selectedFile.name}</span>
+                        <span className="text-[10px] text-emerald-400/80">
+                          ({(selectedFile.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveSelectedFile}
+                        disabled={isSubmitting}
+                        className="text-slate-400 hover:text-rose-400 text-xs px-1.5 py-0.5 rounded hover:bg-white/5"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  )}
+
+                  {newImagePreview && (
+                    <div className="relative mt-2 h-28 w-full rounded-lg overflow-hidden border border-slate-700">
+                      <img
+                        src={newImagePreview}
+                        alt="Preview Foto Inovasi"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Status Indicator & Error Alert */}
+              {isSubmitting && (
+                <div className="p-3 rounded-xl bg-emerald-950/70 border border-emerald-500/50 flex items-center gap-2.5 text-xs text-emerald-200 animate-pulse">
+                  <Loader2 className="h-4 w-4 animate-spin text-emerald-400 shrink-0" />
+                  <span>{submitStatus || 'Sedang memproses dan menyimpan ke Supabase...'}</span>
+                </div>
+              )}
+
+              {formError && (
+                <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-600/60 flex items-start gap-2.5 text-xs text-rose-200">
+                  <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold">Gagal Menyimpan:</p>
+                    <p>{formError}</p>
+                    {onOpenSupabaseStatus && (
+                      <button
+                        type="button"
+                        onClick={onOpenSupabaseStatus}
+                        className="underline text-rose-300 hover:text-white text-[11px]"
+                      >
+                        Buka Panduan SQL & Konfigurasi Supabase
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium shadow-md"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md disabled:opacity-50 transition-all"
                 >
-                  Simpan Karya Inovasi
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Menyimpan ke Supabase...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="h-4 w-4" />
+                      <span>Simpan Karya Inovasi</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

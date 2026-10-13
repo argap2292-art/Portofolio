@@ -58,7 +58,20 @@ CREATE POLICY "Akses Publik Berkas Publikasi" ON storage.objects
 
 DROP POLICY IF EXISTS "Upload Publik Berkas Publikasi" ON storage.objects;
 CREATE POLICY "Upload Publik Berkas Publikasi" ON storage.objects
-  FOR INSERT TO anon WITH CHECK (bucket_id = 'berkas-publikasi');`;
+  FOR INSERT TO anon WITH CHECK (bucket_id = 'berkas-publikasi');
+
+-- 4. Konfigurasi Supabase Storage Bucket "berkas-inovasi" untuk Dokumen/Media/Foto
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('berkas-inovasi', 'berkas-inovasi', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Akses Publik Berkas Inovasi" ON storage.objects;
+CREATE POLICY "Akses Publik Berkas Inovasi" ON storage.objects
+  FOR SELECT TO anon USING (bucket_id = 'berkas-inovasi');
+
+DROP POLICY IF EXISTS "Upload Publik Berkas Inovasi" ON storage.objects;
+CREATE POLICY "Upload Publik Berkas Inovasi" ON storage.objects
+  FOR INSERT TO anon WITH CHECK (bucket_id = 'berkas-inovasi');`;
 
   const handleCopySql = () => {
     navigator.clipboard.writeText(sqlScript);

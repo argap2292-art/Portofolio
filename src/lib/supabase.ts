@@ -6,6 +6,7 @@ export const SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhubGNrZmZ5ZHV1amRpZHZ2cnRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4Mjg5NzIsImV4cCI6MjEwNzQwNDk3Mn0.8LLx590UrhfyeuJ34Ph-MdM99dNO54bLq8GklpvA-7g';
 
 export const BUCKET_BERKAS_PUBLIKASI = 'berkas-publikasi';
+export const BUCKET_BERKAS_INOVASI = 'berkas-inovasi';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -70,6 +71,64 @@ export async function uploadPublicationPdf(
 
     const { data: pubData } = supabase.storage
       .from(BUCKET_BERKAS_PUBLIKASI)
+      .getPublicUrl(fileName);
+
+    return { url: pubData.publicUrl, error: null };
+  } catch (err: any) {
+    return { url: null, error: err };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 1b. SUPABASE STORAGE: UNGGAH DOKUMEN / MEDIA KE BUCKET "berkas-inovasi"
+// ---------------------------------------------------------------------------
+
+export async function uploadInnovationFile(
+  file: File
+): Promise<{
+  url: string | null;
+  error: Error | null;
+  needsRlsFix?: boolean;
+  bucketNotFound?: boolean;
+}> {
+  try {
+    const ext = file.name.split('.').pop() || 'bin';
+    const cleanBaseName = file.name
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 40);
+    const fileName = `${Date.now()}_${cleanBaseName}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from(BUCKET_BERKAS_INOVASI)
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || undefined,
+      });
+
+    if (error) {
+      console.warn('[Supabase Storage berkas-inovasi] Gagal upload:', error.message);
+      const isBucketNotFound =
+        error.message?.includes('Bucket not found') ||
+        (error as any).statusCode === '404' ||
+        (error as any).code === 'NoSuchBucket';
+      const isRls =
+        error.message?.includes('violates row-level security') ||
+        (error as any).statusCode === '403' ||
+        (error as any).code === 'AccessDenied' ||
+        (error as any).code === '42501';
+
+      return {
+        url: null,
+        error: new Error(error.message),
+        bucketNotFound: isBucketNotFound,
+        needsRlsFix: isRls,
+      };
+    }
+
+    const { data: pubData } = supabase.storage
+      .from(BUCKET_BERKAS_INOVASI)
       .getPublicUrl(fileName);
 
     return { url: pubData.publicUrl, error: null };
@@ -303,9 +362,32 @@ export async function fetchInnovationsFromSupabase(): Promise<{
 }
 
 export async function insertInnovationToSupabase(
-  item: Omit<InnovationItem, 'id'>
-): Promise<{ data: InnovationItem | null; error: Error | null; needsRlsFix?: boolean }> {
+  item: Omit<InnovationItem, 'id'>,
+  file?: File | null
+): Promise<{
+  data: InnovationItem | null;
+  error: Error | null;
+  needsRlsFix?: boolean;
+  storageWarning?: string | null;
+}> {
   try {
+    let finalExternalUrl = item.externalLink || item.documentUrl || '';
+    let storageWarning: string | null = null;
+
+    // 1. Jika ada file dokumen/media yang dipilih, unggah terlebih dahulu ke Supabase Storage bucket "berkas-inovasi"
+    if (file) {
+      console.info('[Supabase Storage] Mengunggah berkas ke bucket berkas-inovasi...');
+      const uploadRes = await uploadInnovationFile(file);
+      if (uploadRes.error) {
+        console.warn('[Supabase Storage] Gagal mengunggah file inovasi:', uploadRes.error.message);
+        storageWarning = uploadRes.bucketNotFound
+          ? `Bucket '${BUCKET_BERKAS_INOVASI}' belum dibuat di Supabase Storage.`
+          : `Gagal mengunggah file ke Storage: ${uploadRes.error.message}`;
+      } else if (uploadRes.url) {
+        finalExternalUrl = uploadRes.url;
+      }
+    }
+
     const categoryLabels: Record<InnovationItem['category'], string> = {
       media_digital: 'Media Digital & Smart Screen',
       ekstrakurikuler: 'Ekstrakurikuler & Seni Rebana',
@@ -313,19 +395,21 @@ export async function insertInnovationToSupabase(
       modul_ajar: 'Modul Ajar & Kurikulum',
     };
 
+    // 2. Siapkan baris data sesuai struktur kolom tabel "Karya Inovasi"
+    // PENTING: Kolom 'id' bertipe int8 Primary Key tidak disertakan dalam .insert()
     const payloadFull: Record<string, any> = {
       'Judul Karya': item.title,
       'Kategori Program': categoryLabels[item.category] || item.category,
       'Tahun Pelaksanaan': item.year,
-      'Kata Kunci': Array.isArray(item.tags) ? item.tags.join(', ') : item.tags,
       'Deskripsi Lengkap': item.description || '',
-      'Tautan Eksternal/Dok': item.externalLink || item.documentUrl || item.imageUrl || '',
+      'Kata Kunci': Array.isArray(item.tags) ? item.tags.join(', ') : item.tags || '',
+      'Tautan Eksternal/Dok': finalExternalUrl,
     };
 
-    // Try full insert first
+    // 3. Simpan ke database Supabase
     let res = await supabase.from('Karya Inovasi').insert([payloadFull]).select();
 
-    // If column Deskripsi Lengkap or Tautan Eksternal/Dok doesn't exist yet, fallback to base columns
+    // Fallback jika kolom Deskripsi Lengkap atau Tautan Eksternal/Dok belum ada di cache schema
     if (res.error && res.error.message.includes('in the schema cache')) {
       console.info(
         '[Supabase] Kolom Deskripsi Lengkap/Tautan belum ada di tabel, menyimpan kolom dasar...'
@@ -334,7 +418,7 @@ export async function insertInnovationToSupabase(
         'Judul Karya': item.title,
         'Kategori Program': categoryLabels[item.category] || item.category,
         'Tahun Pelaksanaan': item.year,
-        'Kata Kunci': Array.isArray(item.tags) ? item.tags.join(', ') : item.tags,
+        'Kata Kunci': Array.isArray(item.tags) ? item.tags.join(', ') : item.tags || '',
       };
       res = await supabase.from('Karya Inovasi').insert([payloadBase]).select();
     }
@@ -345,16 +429,21 @@ export async function insertInnovationToSupabase(
         data: null,
         error: new Error(res.error.message),
         needsRlsFix: res.error.code === '42501',
+        storageWarning,
       };
     }
 
     const insertedRow = res.data?.[0];
+    const isImageFile = finalExternalUrl?.match(/\.(jpeg|jpg|png|gif|webp|svg)(\?.*)?$/i);
     const createdItem: InnovationItem = {
       ...item,
       id: insertedRow ? String(insertedRow.id) : `inv-${Date.now()}`,
+      externalLink: finalExternalUrl || undefined,
+      documentUrl: finalExternalUrl || undefined,
+      imageUrl: isImageFile ? finalExternalUrl : item.imageUrl,
     };
 
-    return { data: createdItem, error: null };
+    return { data: createdItem, error: null, storageWarning };
   } catch (err: any) {
     return { data: null, error: err };
   }

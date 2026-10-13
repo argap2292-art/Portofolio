@@ -54,7 +54,17 @@ DROP POLICY IF EXISTS "Akses Publik Berkas Publikasi" ON storage.objects;
 CREATE POLICY "Akses Publik Berkas Publikasi" ON storage.objects FOR SELECT TO anon USING (bucket_id = 'berkas-publikasi');
 
 DROP POLICY IF EXISTS "Upload Publik Berkas Publikasi" ON storage.objects;
-CREATE POLICY "Upload Publik Berkas Publikasi" ON storage.objects FOR INSERT TO anon WITH CHECK (bucket_id = 'berkas-publikasi');</pre>
+CREATE POLICY "Upload Publik Berkas Publikasi" ON storage.objects FOR INSERT TO anon WITH CHECK (bucket_id = 'berkas-publikasi');
+
+-- 4. Konfigurasi Bucket Storage "berkas-inovasi" untuk Dokumen/Media/Foto
+INSERT INTO storage.buckets (id, name, public) VALUES ('berkas-inovasi', 'berkas-inovasi', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Akses Publik Berkas Inovasi" ON storage.objects;
+CREATE POLICY "Akses Publik Berkas Inovasi" ON storage.objects FOR SELECT TO anon USING (bucket_id = 'berkas-inovasi');
+
+DROP POLICY IF EXISTS "Upload Publik Berkas Inovasi" ON storage.objects;
+CREATE POLICY "Upload Publik Berkas Inovasi" ON storage.objects FOR INSERT TO anon WITH CHECK (bucket_id = 'berkas-inovasi');</pre>
     </div>
 
     <!-- Grid 2 Kolom: Form Publikasi & Form Karya Inovasi -->
@@ -178,8 +188,14 @@ CREATE POLICY "Upload Publik Berkas Publikasi" ON storage.objects FOR INSERT TO 
             </div>
 
             <div>
-              <label class="block text-slate-300 font-medium mb-1">Tautan Eksternal / Dok (Google Drive, YouTube, dll)</label>
+              <label class="block text-slate-300 font-medium mb-1">Tautan Eksternal / Dok (Google Drive, YouTube, dll - Opsional)</label>
               <input type="url" id="inv-tautan" placeholder="https://drive.google.com/... atau https://youtube.com/..." class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+              <label class="block text-slate-300 font-medium mb-1">Unggah Dokumen / Media / Foto (Choose File - Opsional)</label>
+              <input type="file" id="inv-file" class="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-teal-600 file:text-white file:text-xs hover:file:bg-teal-500 cursor-pointer">
+              <p class="text-[10px] text-slate-400 mt-1">Jika ada file dipilih, file akan diunggah via <code>supabase.storage.from('berkas-inovasi').upload(...)</code>, lalu Public URL-nya otomatis disimpan ke kolom database <code>'Tautan Eksternal/Dok'</code>.</p>
             </div>
 
             <button type="submit" id="btn-submit-inv" class="w-full py-2.5 px-4 rounded-xl bg-teal-600 hover:teal-500 font-semibold text-white transition-colors shadow-lg">

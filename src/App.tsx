@@ -188,52 +188,89 @@ export default function App() {
   // -------------------------------------------------------------------------
   // Add & Delete Innovation handlers (Online to Supabase)
   // -------------------------------------------------------------------------
-  const handleAddInnovation = async (item: Omit<InnovationItem, 'id'>) => {
-    // Optimistic item
-    const tempId = `inv-${Date.now()}`;
-    const optimisticItem: InnovationItem = { ...item, id: tempId };
+  const handleAddInnovation = async (
+    item: Omit<InnovationItem, 'id'>,
+    file?: File | null
+  ): Promise<{ success: boolean; error?: string; storageWarning?: string | null }> => {
+    setIsSupabaseLoading(true);
+    setSupabaseError(null);
 
-    setInnovations((prev) => {
-      const updated = [optimisticItem, ...prev];
-      localStorage.setItem('arga_portfolio_innovations_empty_v1', JSON.stringify(updated));
-      return updated;
-    });
+    try {
+      showToast(
+        file
+          ? 'Mengunggah berkas inovasi & menyimpan data ke Supabase...'
+          : 'Menyimpan karya inovasi ke Supabase Cloud...'
+      );
 
-    showToast('Menyimpan karya inovasi ke Supabase...');
+      const res = await insertInnovationToSupabase(item, file);
 
-    const res = await insertInnovationToSupabase(item);
-    if (res.error) {
-      console.warn('Gagal menyimpan ke Supabase:', res.error.message);
-      if (res.needsRlsFix) {
-        setShowRlsBanner(true);
-        setIsSupabaseModalOpen(true);
+      if (res.error) {
+        console.error('[Supabase] Gagal menyimpan karya inovasi:', res.error);
+        const errMsg = res.error.message;
+        setSupabaseError(errMsg);
+
+        if (res.needsRlsFix) {
+          setShowRlsBanner(true);
+          setIsSupabaseModalOpen(true);
+        }
+
+        showToast(`Gagal ke Supabase: ${errMsg}`);
+        return { success: false, error: errMsg };
       }
-      showToast('Tersimpan di memori perangkat (aktifkan RLS Supabase untuk cloud)');
-    } else if (res.data) {
-      const savedItem = res.data;
-      setInnovations((prev) => {
-        const updated = prev.map((inv) => (inv.id === tempId ? savedItem : inv));
-        localStorage.setItem('arga_portfolio_innovations_empty_v1', JSON.stringify(updated));
-        return updated;
-      });
-      setLastSyncTime(new Date());
-      showToast('Karya inovasi berhasil disimpan ke Supabase Cloud!');
+
+      if (res.data) {
+        const savedItem = res.data;
+        // Update live state dengan baris nyata dari Supabase
+        setInnovations((prev) => [savedItem, ...prev]);
+        setLastSyncTime(new Date());
+
+        // Update local backup cache
+        try {
+          const cached = JSON.parse(
+            localStorage.getItem('arga_portfolio_innovations_empty_v1') || '[]'
+          );
+          localStorage.setItem(
+            'arga_portfolio_innovations_empty_v1',
+            JSON.stringify([savedItem, ...cached.filter((i: any) => i.id !== savedItem.id)])
+          );
+        } catch (_) {}
+
+        if (res.storageWarning) {
+          showToast(`Karya inovasi tersimpan (${res.storageWarning})`);
+        } else if (file) {
+          showToast('Berkas & Karya inovasi berhasil disimpan ke Supabase Cloud!');
+        } else {
+          showToast('Karya inovasi berhasil disimpan ke Supabase Cloud!');
+        }
+
+        return { success: true, storageWarning: res.storageWarning };
+      }
+
+      return { success: false, error: 'Tidak ada data respons dari database' };
+    } catch (err: any) {
+      const errMsg = err.message || 'Terjadi kesalahan sistem';
+      showToast(`Eror: ${errMsg}`);
+      return { success: false, error: errMsg };
+    } finally {
+      setIsSupabaseLoading(false);
     }
   };
 
   const handleDeleteInnovation = async (id: string) => {
-    setInnovations((prev) => {
-      const updated = prev.filter((item) => item.id !== id);
-      localStorage.setItem('arga_portfolio_innovations_empty_v1', JSON.stringify(updated));
-      return updated;
-    });
-
-    showToast('Menghapus data...');
+    showToast('Menghapus karya inovasi dari Supabase...');
     const res = await deleteInnovationFromSupabase(id);
     if (!res.success && res.error) {
       console.warn('Gagal menghapus dari Supabase:', res.error.message);
+      showToast(`Gagal menghapus: ${res.error.message}`);
     } else {
-      showToast('Data karya inovasi terhapus');
+      setInnovations((prev) => {
+        const updated = prev.filter((item) => item.id !== id);
+        try {
+          localStorage.setItem('arga_portfolio_innovations_empty_v1', JSON.stringify(updated));
+        } catch (_) {}
+        return updated;
+      });
+      showToast('Karya inovasi berhasil dihapus');
     }
   };
 
@@ -419,6 +456,7 @@ export default function App() {
           onOpenLightbox={handleOpenLightbox}
           onAddInnovation={handleAddInnovation}
           onDeleteInnovation={handleDeleteInnovation}
+          onOpenSupabaseStatus={() => setIsSupabaseModalOpen(true)}
         />
 
         {/* 4. Halaman / Bagian Publikasi: Tesis S-2, Jurnal, Skripsi, Prosiding, & Space Interaktif */}
