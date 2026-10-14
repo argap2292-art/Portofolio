@@ -1,5 +1,7 @@
 import React from 'react';
 import { Heart, MapPin, Mail, ArrowUp } from 'lucide-react';
+import { FaInstagram, FaTiktok, FaFacebookF, FaWhatsapp } from 'react-icons/fa6';
+import { SOCIAL_LINKS } from '../data/portfolioData';
 
 interface FooterProps {
   onNavigate: (sectionId: string) => void;
@@ -45,15 +47,60 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenContact }) => 
             </button>
           </nav>
 
-          {/* Back to top button */}
-          <button
-            onClick={scrollToTop}
-            aria-label="Kembali ke atas"
-            className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors"
-            title="Kembali ke atas"
-          >
-            <ArrowUp className="h-4 w-4" />
-          </button>
+          {/* Social Icons & Back to top button */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 border-r border-slate-200 pr-3">
+              <a
+                href={SOCIAL_LINKS.whatsapp.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-all"
+                title="WhatsApp: 0812-3281-2521"
+                aria-label="WhatsApp"
+              >
+                <FaWhatsapp className="h-4 w-4" />
+              </a>
+              <a
+                href={SOCIAL_LINKS.instagram.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg bg-pink-50 text-pink-700 hover:bg-pink-600 hover:text-white transition-all"
+                title="Instagram: @putrap.11"
+                aria-label="Instagram"
+              >
+                <FaInstagram className="h-4 w-4" />
+              </a>
+              <a
+                href={SOCIAL_LINKS.tiktok.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg bg-slate-100 text-slate-800 hover:bg-slate-900 hover:text-white transition-all"
+                title="TikTok: @_argap11"
+                aria-label="TikTok"
+              >
+                <FaTiktok className="h-4 w-4" />
+              </a>
+              <a
+                href={encodeURI(SOCIAL_LINKS.facebook.url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white transition-all"
+                title="Facebook: Putra Tama"
+                aria-label="Facebook"
+              >
+                <FaFacebookF className="h-4 w-4" />
+              </a>
+            </div>
+
+            <button
+              onClick={scrollToTop}
+              aria-label="Kembali ke atas"
+              className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors"
+              title="Kembali ke atas"
+            >
+              <ArrowUp className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Quiet Copyright & Location */}

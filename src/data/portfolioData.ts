@@ -11,7 +11,30 @@ export const INITIAL_PROFILE: ProfileData = {
   lifeMotivationJavanese: 'dadio wong seng rumongso cukup ben ora rumongso kurang ae neng urip',
   lifeMotivationIndonesian: 'Jadilah orang yang merasa cukup, agar tidak selalu merasa kurang dalam menjalani kehidupan.',
   email: 'argap2292@gmail.com',
-  phoneOrWa: '+62 812-3456-7890',
+  phoneOrWa: '+62 812-3281-2521',
+};
+
+export const SOCIAL_LINKS = {
+  instagram: {
+    name: 'Instagram',
+    username: '@putrap.11',
+    url: 'https://instagram.com/putrap.11',
+  },
+  tiktok: {
+    name: 'TikTok',
+    username: '@_argap11',
+    url: 'https://www.tiktok.com/@_argap11',
+  },
+  facebook: {
+    name: 'Facebook',
+    username: 'Putra Tama',
+    url: 'https://facebook.com/Putra Tama',
+  },
+  whatsapp: {
+    name: 'WhatsApp',
+    number: '+62 812-3281-2521',
+    url: 'https://wa.me/6281232812521?text=Halo%20Mas%20Arga,%20saya%20menghubungi%20Anda%20melalui%20website%20portofolio.',
+  },
 };
 
 export const INITIAL_EDUCATION: EducationItem[] = [

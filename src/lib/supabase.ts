@@ -85,8 +85,62 @@ export async function uploadPublicationPdf(
 }
 
 // ---------------------------------------------------------------------------
-// 1b. SUPABASE STORAGE: UNGGAH DOKUMEN / MEDIA KE BUCKET "berkas-inovasi"
+// 1b. SUPABASE STORAGE & IMAGE COMPRESSION: UNGGAH DOKUMEN / MEDIA
 // ---------------------------------------------------------------------------
+
+/**
+ * Mengompresi file gambar secara otomatis ke resolusi optimal (max 1200px, 82% quality)
+ * dan mengembalikan base64 Data URL. Sangat andal sebagai fallback instan jika storage bucket belum siap.
+ */
+export function fileToCompressedDataUrl(
+  file: File,
+  maxDimension: number = 1200,
+  quality: number = 0.82
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataUrl);
+      };
+      img.onerror = () => resolve(e.target?.result as string);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export async function uploadInnovationFile(
   file: File
@@ -299,6 +353,99 @@ export async function deletePublicationFromSupabase(
 // 3. KARYA INOVASI FUNCTIONS
 // ---------------------------------------------------------------------------
 
+/**
+ * Helper untuk mendeteksi dan mengekstrak media/gambar/dokumen dari baris database 'Karya Inovasi'.
+ * Menangani berbagai variasi kolom (Tautan Eksternal/Dok, imageUrl, Gambar, Foto, Berkas),
+ * Google Drive link (folder atau file), Supabase Storage public URL, dan base64 Data URL.
+ */
+export function resolveInnovationMedia(row: any): {
+  imageUrl?: string;
+  externalLink?: string;
+  isDriveLink: boolean;
+  driveType?: 'folder' | 'file';
+} {
+  if (!row) {
+    return { isDriveLink: false };
+  }
+
+  // 1. Cek semua variasi nama kolom untuk tautan / dokumen / berkas
+  const rawLink = String(
+    row['Tautan Eksternal/Dok'] ||
+    row['Tautan Eksternal'] ||
+    row['Tautan'] ||
+    row['imageUrl'] ||
+    row['image_url'] ||
+    row['Gambar'] ||
+    row['Foto'] ||
+    row['Berkas'] ||
+    row['File'] ||
+    row['url_gambar'] ||
+    row['foto_url'] ||
+    row['documentUrl'] ||
+    row['document_url'] ||
+    ''
+  ).trim();
+
+  // 2. Cek kolom khusus gambar jika tersedia
+  const directImg = String(
+    row['imageUrl'] ||
+    row['image_url'] ||
+    row['Gambar'] ||
+    row['Foto'] ||
+    row['url_gambar'] ||
+    row['foto_url'] ||
+    ''
+  ).trim();
+
+  let resolvedImageUrl: string | undefined = undefined;
+  let isDriveLink = false;
+  let driveType: 'folder' | 'file' | undefined = undefined;
+
+  // Analisis Google Drive Link
+  if (rawLink.includes('drive.google.com')) {
+    isDriveLink = true;
+    if (rawLink.includes('/drive/folders/')) {
+      driveType = 'folder';
+    } else {
+      driveType = 'file';
+      const fileIdMatch = rawLink.match(/(?:file\/d\/|open\?id=|uc\?id=)([a-zA-Z0-9_-]+)/i);
+      if (fileIdMatch && fileIdMatch[1]) {
+        resolvedImageUrl = `https://drive.google.com/thumbnail?id=${fileIdMatch[1]}&sz=w1000`;
+      }
+    }
+  }
+
+  // Jika ada kolom gambar eksplisit
+  if (directImg) {
+    resolvedImageUrl = directImg;
+  }
+
+  // Jika tautan adalah base64 Data URL gambar
+  if (!resolvedImageUrl && rawLink.startsWith('data:image/')) {
+    resolvedImageUrl = rawLink;
+  }
+
+  // Jika tautan adalah file gambar online atau Supabase Storage URL
+  if (
+    !resolvedImageUrl &&
+    (
+      /\.(jpeg|jpg|png|gif|webp|svg|bmp|avif)($|\?|#)/i.test(rawLink) ||
+      rawLink.includes('/storage/v1/object/public/') ||
+      rawLink.includes('images.unsplash.com') ||
+      rawLink.includes('imgur.com')
+    )
+  ) {
+    resolvedImageUrl = rawLink;
+  }
+
+  return {
+    imageUrl: resolvedImageUrl,
+    externalLink: rawLink || undefined,
+    isDriveLink,
+    driveType,
+  };
+}
+
 export async function fetchInnovationsFromSupabase(): Promise<{
   data: InnovationItem[];
   error: Error | null;
@@ -343,7 +490,8 @@ export async function fetchInnovationsFromSupabase(): Promise<{
               .filter(Boolean)
           : [];
 
-      const extLink = row['Tautan Eksternal/Dok'] || '';
+      // Resolusi media, gambar, dan tautan dokumen dengan fleksibel
+      const media = resolveInnovationMedia(row);
 
       return {
         id: rowId,
@@ -354,9 +502,9 @@ export async function fetchInnovationsFromSupabase(): Promise<{
           row['Deskripsi Lengkap'] ||
           'Inovasi pembelajaran dan pengembangan pendidikan agama Islam.',
         tags: tagsArray.length > 0 ? tagsArray : ['Inovasi', 'Pendidikan'],
-        externalLink: extLink || undefined,
-        documentUrl: extLink || undefined,
-        imageUrl: extLink?.match(/\.(jpeg|jpg|png|gif|webp|svg)$/i) ? extLink : undefined,
+        externalLink: media.externalLink,
+        documentUrl: media.externalLink,
+        imageUrl: media.imageUrl,
       };
     });
 
@@ -379,18 +527,36 @@ export async function insertInnovationToSupabase(
     let finalExternalUrl = item.externalLink || item.documentUrl || '';
     let storageWarning: string | null = null;
 
-    // 1. Jika ada file dokumen/media yang dipilih, unggah terlebih dahulu ke Supabase Storage bucket "berkas-inovasi"
+    // 1. Jika ada file dokumen/media yang dipilih, unggah ke Storage bucket "berkas-inovasi"
     if (file) {
       console.info('[Supabase Storage] Mengunggah berkas ke bucket berkas-inovasi...');
       const uploadRes = await uploadInnovationFile(file);
-      if (uploadRes.error) {
-        console.warn('[Supabase Storage] Gagal mengunggah file inovasi:', uploadRes.error.message);
-        storageWarning = uploadRes.bucketNotFound
-          ? `Bucket '${BUCKET_BERKAS_INOVASI}' belum dibuat di Supabase Storage.`
-          : `Gagal mengunggah file ke Storage: ${uploadRes.error.message}`;
-      } else if (uploadRes.url) {
+      if (uploadRes.url) {
         finalExternalUrl = uploadRes.url;
+      } else {
+        console.warn('[Supabase Storage] Gagal mengunggah file inovasi:', uploadRes.error?.message);
+        // Fallback cerdas: Jika file adalah gambar, kompres dan simpan sebagai base64 Data URL langsung ke database
+        if (file.type.startsWith('image/')) {
+          try {
+            const compressed = await fileToCompressedDataUrl(file);
+            finalExternalUrl = compressed;
+            storageWarning = uploadRes.bucketNotFound
+              ? `Foto disimpan langsung ke database (bucket '${BUCKET_BERKAS_INOVASI}' belum dibuat).`
+              : `Foto disimpan ke database (${uploadRes.error?.message || 'Storage error'}).`;
+          } catch (_) {
+            if (item.imageUrl) finalExternalUrl = item.imageUrl;
+          }
+        } else if (item.imageUrl) {
+          finalExternalUrl = item.imageUrl;
+        } else {
+          storageWarning = uploadRes.bucketNotFound
+            ? `Bucket '${BUCKET_BERKAS_INOVASI}' belum dibuat di Supabase Storage.`
+            : `Gagal mengunggah file ke Storage: ${uploadRes.error?.message}`;
+        }
       }
+    } else if (item.imageUrl && !finalExternalUrl) {
+      // Jika pengguna menyertakan gambar preview atau tautan gambar
+      finalExternalUrl = item.imageUrl;
     }
 
     const categoryLabels: Record<InnovationItem['category'], string> = {
@@ -439,7 +605,11 @@ export async function insertInnovationToSupabase(
     }
 
     const insertedRow = res.data?.[0];
-    const isImageFile = finalExternalUrl?.match(/\.(jpeg|jpg|png|gif|webp|svg)(\?.*)?$/i);
+    const isImageFile =
+      finalExternalUrl?.startsWith('data:image/') ||
+      finalExternalUrl?.match(/\.(jpeg|jpg|png|gif|webp|svg|bmp|avif)($|\?|#)/i) ||
+      finalExternalUrl?.includes('/storage/v1/object/public/');
+
     const createdItem: InnovationItem = {
       ...item,
       id: insertedRow ? String(insertedRow.id) : `inv-${Date.now()}`,
@@ -451,6 +621,50 @@ export async function insertInnovationToSupabase(
     return { data: createdItem, error: null, storageWarning };
   } catch (err: any) {
     return { data: null, error: err };
+  }
+}
+
+/**
+ * Memperbarui foto sampul / tautan gambar untuk kartu Karya Inovasi yang sudah ada di Supabase.
+ */
+export async function updateInnovationPhotoInSupabase(
+  id: string,
+  fileOrUrl: File | string
+): Promise<{ success: boolean; url?: string; error: Error | null }> {
+  try {
+    let finalUrl = '';
+
+    if (typeof fileOrUrl === 'string') {
+      finalUrl = fileOrUrl.trim();
+    } else {
+      // Coba upload ke Supabase Storage terlebih dahulu
+      const uploadRes = await uploadInnovationFile(fileOrUrl);
+      if (uploadRes.url) {
+        finalUrl = uploadRes.url;
+      } else {
+        // Fallback: kompres ke base64 data URL
+        finalUrl = await fileToCompressedDataUrl(fileOrUrl);
+      }
+    }
+
+    if (!finalUrl) {
+      return { success: false, error: new Error('Tautan atau berkas gambar tidak valid.') };
+    }
+
+    const numericId = Number(id);
+    const query = Number.isFinite(numericId)
+      ? supabase.from('Karya Inovasi').update({ 'Tautan Eksternal/Dok': finalUrl }).eq('id', numericId).select()
+      : supabase.from('Karya Inovasi').update({ 'Tautan Eksternal/Dok': finalUrl }).eq('id', id).select();
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn('[Supabase] Gagal update foto Karya Inovasi:', error.message);
+      return { success: false, error: new Error(error.message) };
+    }
+
+    return { success: true, url: finalUrl, error: null };
+  } catch (err: any) {
+    return { success: false, error: err };
   }
 }
 

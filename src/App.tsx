@@ -29,6 +29,7 @@ import {
   fetchInnovationsFromSupabase,
   insertInnovationToSupabase,
   deleteInnovationFromSupabase,
+  updateInnovationPhotoInSupabase,
   fetchProfileAvatarFromSupabase,
   saveProfileAvatarToSupabase,
   TABLE_PENGATURAN_PROFIL,
@@ -312,6 +313,28 @@ export default function App() {
     }
   };
 
+  const handleUpdateInnovationPhoto = async (id: string, fileOrUrl: File | string) => {
+    showToast('Menyimpan foto inovasi ke Supabase Cloud...');
+    const res = await updateInnovationPhotoInSupabase(id, fileOrUrl);
+    if (!res.success && res.error) {
+      console.warn('Gagal menyimpan foto:', res.error.message);
+      showToast(`Gagal menyimpan foto: ${res.error.message}`);
+    } else {
+      showToast('Foto karya inovasi berhasil disinkronkan ke Supabase!');
+      if (res.url) {
+        setInnovations((prev) => {
+          const updated = prev.map((item) =>
+            item.id === id ? { ...item, imageUrl: res.url, externalLink: res.url } : item
+          );
+          try {
+            localStorage.setItem('arga_portfolio_innovations_empty_v1', JSON.stringify(updated));
+          } catch (_) {}
+          return updated;
+        });
+      }
+    }
+  };
+
   // -------------------------------------------------------------------------
   // Add & Delete Publication handlers (Online to Supabase)
   // -------------------------------------------------------------------------
@@ -494,6 +517,7 @@ export default function App() {
           onOpenLightbox={handleOpenLightbox}
           onAddInnovation={handleAddInnovation}
           onDeleteInnovation={handleDeleteInnovation}
+          onUpdateInnovationPhoto={handleUpdateInnovationPhoto}
           onOpenSupabaseStatus={() => setIsSupabaseModalOpen(true)}
         />
 

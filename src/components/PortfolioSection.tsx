@@ -25,7 +25,10 @@ import {
   AlertCircle,
   FileText,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Camera,
+  FolderGit2,
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface PortfolioSectionProps {
@@ -40,6 +43,10 @@ interface PortfolioSectionProps {
     file?: File | null
   ) => Promise<{ success: boolean; error?: string; storageWarning?: string | null } | void> | void;
   onDeleteInnovation?: (id: string) => void;
+  onUpdateInnovationPhoto?: (
+    id: string,
+    fileOrUrl: File | string
+  ) => Promise<{ success: boolean; error?: string } | void> | void;
   onOpenSupabaseStatus?: () => void;
 }
 
@@ -52,12 +59,39 @@ export const PortfolioSection: React.FC<PortfolioSectionProps> = ({
   onOpenLightbox,
   onAddInnovation,
   onDeleteInnovation,
+  onUpdateInnovationPhoto,
   onOpenSupabaseStatus,
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'pendidikan' | 'organisasi' | 'inovasi'>('all');
   const [orgFilter, setOrgFilter] = useState<'all' | 'luar_sekolah' | 'pekerjaan'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [bgBlendMode, setBgBlendMode] = useState<'both' | 'gambar3' | 'gambar4'>('both');
+
+  // State untuk upload / ganti foto langsung pada kartu karya inovasi
+  const [updatingCardId, setUpdatingCardId] = useState<string | null>(null);
+  const [activeUploadCardId, setActiveUploadCardId] = useState<string | null>(null);
+  const cardFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleCardFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && activeUploadCardId && onUpdateInnovationPhoto) {
+      setUpdatingCardId(activeUploadCardId);
+      try {
+        await onUpdateInnovationPhoto(activeUploadCardId, file);
+      } finally {
+        setUpdatingCardId(null);
+        setActiveUploadCardId(null);
+        if (cardFileInputRef.current) {
+          cardFileInputRef.current.value = '';
+        }
+      }
+    }
+  };
+
+  const triggerCardPhotoUpload = (cardId: string) => {
+    setActiveUploadCardId(cardId);
+    cardFileInputRef.current?.click();
+  };
 
   // Form state for adding new innovation to Supabase
   const [newTitle, setNewTitle] = useState('');
@@ -562,103 +596,244 @@ export const PortfolioSection: React.FC<PortfolioSectionProps> = ({
               </div>
             ) : (
               <>
+                {/* Hidden input file for card photo upload/change */}
+                <input
+                  type="file"
+                  ref={cardFileInputRef}
+                  onChange={handleCardFileSelect}
+                  accept="image/*"
+                  className="hidden"
+                />
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {innovationList.map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-2xl border border-white/10 bg-slate-900/75 overflow-hidden backdrop-blur-md flex flex-col justify-between hover:border-emerald-400/40 transition-all group"
-                    >
-                      {/* Image Header if available */}
-                      {item.imageUrl && (
-                        <div 
-                          onClick={() => onOpenLightbox(item.imageUrl!, item.title, item.description)}
-                          className="relative aspect-video w-full overflow-hidden bg-slate-800 cursor-pointer"
-                        >
-                          <img
-                            src={item.imageUrl}
-                            alt={item.title}
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
-                          
-                          <div className="absolute top-3 right-3 p-1.5 rounded-lg bg-black/60 text-white text-xs backdrop-blur-md flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Eye className="h-3.5 w-3.5" />
-                            <span>Perbesar Foto</span>
-                          </div>
+                  {innovationList.map((item) => {
+                    const isDrive = Boolean(item.externalLink && item.externalLink.includes('drive.google.com'));
+                    const isDriveFolder = Boolean(item.externalLink && item.externalLink.includes('/drive/folders/'));
+                    const isUpdatingThisCard = updatingCardId === item.id;
 
-                          <div className="absolute bottom-3 left-3">
-                            <span className="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md bg-emerald-700/80 text-white backdrop-blur-md">
-                              {item.year}
-                            </span>
-                          </div>
-                        </div>
-                      )}
+                    const categoryLabels: Record<InnovationItem['category'], string> = {
+                      media_digital: 'Media Digital & Smart Screen',
+                      ekstrakurikuler: 'Ekstrakurikuler & Seni Rebana',
+                      karakter: 'Pembinaan Karakter & Pramuka',
+                      modul_ajar: 'Modul Ajar & Kurikulum',
+                    };
 
-                      {/* Body Content */}
-                      <div className="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                          <h4 className="text-lg font-bold text-white group-hover:text-emerald-300 transition-colors mb-2">
-                            {item.title}
-                          </h4>
-                          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4">
-                            {item.description}
-                          </p>
-                        </div>
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-2xl border border-white/10 bg-slate-900/75 overflow-hidden backdrop-blur-md flex flex-col justify-between hover:border-emerald-400/40 transition-all group"
+                      >
+                        {/* 1. Image Header Container (jika ada tautan foto / gambar yang diunggah) */}
+                        {item.imageUrl ? (
+                          <div className="relative aspect-video w-full overflow-hidden bg-slate-800 group/img">
+                            <img
+                              src={item.imageUrl}
+                              alt={item.title}
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                // Fallback jika link gambar bermasalah
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                            
+                            {/* Gradient Scrim */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-80" />
 
-                        {/* Tags */}
-                        <div>
-                          <div className="flex flex-wrap gap-1.5 mb-4">
-                            {(item.tags || []).map((tag, tIdx) => (
-                              <span
-                                key={tIdx}
-                                className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-white/10 text-slate-200"
+                            {/* Tombol Aksi di Sudut Kanan Atas Foto */}
+                            <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                onClick={() => onOpenLightbox(item.imageUrl!, item.title, item.description)}
+                                className="px-2 py-1 rounded-lg bg-black/70 hover:bg-black/90 text-white text-xs backdrop-blur-md flex items-center gap-1 transition-all cursor-pointer shadow-sm"
+                                title="Perbesar Foto"
                               >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
+                                <Eye className="h-3.5 w-3.5 text-emerald-400" />
+                                <span className="hidden sm:inline text-[11px] font-medium">Perbesar</span>
+                              </button>
 
-                          {/* Footer Actions */}
-                          <div className="flex items-center justify-between pt-3 border-t border-white/10 text-xs">
-                            <span className="text-slate-400">
-                              Kategori: <strong className="text-slate-200">{item.category.replace('_', ' ')}</strong>
-                            </span>
-
-                            <div className="flex items-center gap-3">
-                              {item.externalLink && (
-                                <a
-                                  href={item.externalLink}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-medium"
-                                >
-                                  <span>Buka Tautan</span>
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
-                              )}
-                              {onDeleteInnovation && (
+                              {onUpdateInnovationPhoto && (
                                 <button
                                   type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (window.confirm(`Hapus karya inovasi "${item.title}"?`)) {
-                                      onDeleteInnovation(item.id);
-                                    }
-                                  }}
-                                  className="inline-flex items-center gap-1 text-rose-400 hover:text-rose-300 transition-colors p-1 rounded-md hover:bg-rose-500/10"
-                                  title="Hapus Karya Inovasi"
+                                  disabled={isUpdatingThisCard}
+                                  onClick={() => triggerCardPhotoUpload(item.id)}
+                                  className="px-2 py-1 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs backdrop-blur-md flex items-center gap-1 transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                                  title="Ganti / Perbarui Foto Sampul"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  <span className="text-[11px]">Hapus</span>
+                                  {isUpdatingThisCard ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Camera className="h-3.5 w-3.5" />
+                                  )}
+                                  <span className="hidden sm:inline text-[11px] font-medium">Ganti Foto</span>
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Badges di Sudut Kiri Bawah Foto */}
+                            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                              <span className="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md bg-emerald-700/90 text-white backdrop-blur-md shadow-sm">
+                                {item.year}
+                              </span>
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-black/60 text-slate-200 backdrop-blur-md border border-white/10 hidden sm:inline">
+                                {categoryLabels[item.category] || item.category}
+                              </span>
+                            </div>
+                          </div>
+                        ) : isDrive ? (
+                          /* 2. Fallback: Google Drive Dokumentasi & Berkas Inovasi */
+                          <div className="relative p-4 sm:p-5 bg-gradient-to-r from-emerald-950/70 via-slate-900 to-slate-950 border-b border-white/10 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-inner shrink-0">
+                                <FolderGit2 className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <span className="text-[11px] uppercase font-bold tracking-wider text-emerald-400 block">
+                                  {isDriveFolder ? 'Google Drive Folder Dokumentasi' : 'Google Drive Berkas Inovasi'}
+                                </span>
+                                <span className="text-xs text-slate-300 font-medium">
+                                  Tautan berkas digital terintegrasi online
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-emerald-700/80 text-white shrink-0">
+                                {item.year}
+                              </span>
+                              {onUpdateInnovationPhoto && (
+                                <button
+                                  type="button"
+                                  disabled={isUpdatingThisCard}
+                                  onClick={() => triggerCardPhotoUpload(item.id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-700/70 hover:bg-emerald-600 text-white text-[11px] font-medium transition-all shrink-0 cursor-pointer shadow-sm disabled:opacity-50"
+                                  title="Unggah Foto Sampul untuk Karya Ini"
+                                >
+                                  {isUpdatingThisCard ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Camera className="h-3.5 w-3.5" />
+                                  )}
+                                  <span>Unggah Foto</span>
                                 </button>
                               )}
                             </div>
                           </div>
+                        ) : (
+                          /* 3. Fallback: Banner Kategori Rapi & Opsi Unggah Foto */
+                          <div className="relative p-4 bg-gradient-to-r from-slate-800/60 via-slate-900/60 to-slate-950 border-b border-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                                <Lightbulb className="h-4 w-4" />
+                              </div>
+                              <span className="text-xs font-semibold text-slate-300">
+                                {categoryLabels[item.category] || item.category}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white/10 text-slate-300 shrink-0">
+                                {item.year}
+                              </span>
+                              {onUpdateInnovationPhoto && (
+                                <button
+                                  type="button"
+                                  disabled={isUpdatingThisCard}
+                                  onClick={() => triggerCardPhotoUpload(item.id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-700/70 hover:bg-emerald-600 text-white text-[11px] font-medium transition-all shrink-0 cursor-pointer shadow-sm disabled:opacity-50"
+                                  title="Unggah Foto Sampul untuk Karya Ini"
+                                >
+                                  {isUpdatingThisCard ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Camera className="h-3 w-3" />
+                                  )}
+                                  <span>Unggah Foto</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Body Content */}
+                        <div className="p-6 flex-1 flex flex-col justify-between">
+                          <div>
+                            <h4 className="text-lg font-bold text-white group-hover:text-emerald-300 transition-colors mb-2">
+                              {item.title}
+                            </h4>
+                            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 whitespace-pre-line">
+                              {item.description}
+                            </p>
+                          </div>
+
+                          {/* Tags */}
+                          <div>
+                            <div className="flex flex-wrap gap-1.5 mb-4">
+                              {(item.tags || []).map((tag, tIdx) => (
+                                <span
+                                  key={tIdx}
+                                  className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-white/10 text-slate-200"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+
+                            {/* Footer Actions */}
+                            <div className="flex items-center justify-between pt-3 border-t border-white/10 text-xs gap-2">
+                              <span className="text-slate-400 truncate">
+                                Kategori: <strong className="text-slate-200">{categoryLabels[item.category] || item.category}</strong>
+                              </span>
+
+                              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                                {item.externalLink && (
+                                  <a
+                                    href={item.externalLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-medium"
+                                  >
+                                    <span>{isDrive ? 'Buka Google Drive' : 'Buka Tautan'}</span>
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+
+                                {onUpdateInnovationPhoto && (
+                                  <button
+                                    type="button"
+                                    disabled={isUpdatingThisCard}
+                                    onClick={() => triggerCardPhotoUpload(item.id)}
+                                    className="inline-flex items-center gap-1 text-slate-300 hover:text-emerald-400 transition-colors p-1 rounded-md hover:bg-white/5 cursor-pointer disabled:opacity-50"
+                                    title="Ganti / Perbarui Foto"
+                                  >
+                                    <Camera className="h-3.5 w-3.5" />
+                                    <span className="text-[11px] hidden sm:inline">Foto</span>
+                                  </button>
+                                )}
+
+                                {onDeleteInnovation && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (window.confirm(`Hapus karya inovasi "${item.title}"?`)) {
+                                        onDeleteInnovation(item.id);
+                                      }
+                                    }}
+                                    className="inline-flex items-center gap-1 text-rose-400 hover:text-rose-300 transition-colors p-1 rounded-md hover:bg-rose-500/10 cursor-pointer"
+                                    title="Hapus Karya Inovasi"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <span className="text-[11px]">Hapus</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Additional Add Prompt */}
