@@ -29,6 +29,9 @@ import {
   fetchInnovationsFromSupabase,
   insertInnovationToSupabase,
   deleteInnovationFromSupabase,
+  fetchProfileAvatarFromSupabase,
+  saveProfileAvatarToSupabase,
+  TABLE_PENGATURAN_PROFIL,
   supabase,
 } from './lib/supabase';
 import { Database, ShieldAlert, Sparkles, Check } from 'lucide-react';
@@ -100,16 +103,17 @@ export default function App() {
   };
 
   // -------------------------------------------------------------------------
-  // Fetch from Supabase
+  // Fetch from Supabase (Publications, Innovations, & Profile Avatar)
   // -------------------------------------------------------------------------
   const loadDataFromSupabase = useCallback(async () => {
     setIsSupabaseLoading(true);
     setSupabaseError(null);
 
     try {
-      const [pubRes, invRes] = await Promise.all([
+      const [pubRes, invRes, avatarRes] = await Promise.all([
         fetchPublicationsFromSupabase(),
         fetchInnovationsFromSupabase(),
+        fetchProfileAvatarFromSupabase(),
       ]);
 
       if (pubRes.error || invRes.error) {
@@ -131,6 +135,15 @@ export default function App() {
           JSON.stringify(invRes.data)
         );
 
+        // Sinkronisasi foto profil dari Supabase (avatar_url)
+        if (avatarRes.avatarUrl) {
+          setPhotos((prev: typeof DEFAULT_PHOTOS) => {
+            const updated = { ...prev, profilSaya: avatarRes.avatarUrl! };
+            localStorage.setItem('arga_portfolio_photos_v2', JSON.stringify(updated));
+            return updated;
+          });
+        }
+
         setLastSyncTime(new Date());
         setShowRlsBanner(false);
       }
@@ -141,7 +154,7 @@ export default function App() {
     }
   }, []);
 
-  // Fetch on mount and subscribe to realtime changes
+  // Fetch on mount and subscribe to realtime changes across tables
   useEffect(() => {
     loadDataFromSupabase();
 
@@ -166,6 +179,21 @@ export default function App() {
           });
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: TABLE_PENGATURAN_PROFIL },
+        () => {
+          fetchProfileAvatarFromSupabase().then((res) => {
+            if (res.avatarUrl) {
+              setPhotos((prev: typeof DEFAULT_PHOTOS) => {
+                const updated = { ...prev, profilSaya: res.avatarUrl! };
+                localStorage.setItem('arga_portfolio_photos_v2', JSON.stringify(updated));
+                return updated;
+              });
+            }
+          });
+        }
+      )
       .subscribe();
 
     return () => {
@@ -173,8 +201,8 @@ export default function App() {
     };
   }, [loadDataFromSupabase]);
 
-  // Sync photos to LocalStorage
-  const handleUpdatePhoto = (
+  // Sync photos to State, LocalStorage, and Supabase for profile photo
+  const handleUpdatePhoto = async (
     slotKey: 'gambar1' | 'gambar2' | 'gambar3' | 'gambar4' | 'profilSaya',
     newUrl: string
   ) => {
@@ -183,6 +211,16 @@ export default function App() {
       localStorage.setItem('arga_portfolio_photos_v2', JSON.stringify(updated));
       return updated;
     });
+
+    // Jika yang diubah adalah foto profil saya, simpan ke tabel Pengaturan _Profil di Supabase
+    if (slotKey === 'profilSaya') {
+      const res = await saveProfileAvatarToSupabase(newUrl);
+      if (res.error) {
+        console.warn('[Supabase DB] Catatan sinkronisasi foto profil:', res.error.message);
+      } else {
+        showToast('Foto profil berhasil disinkronkan ke seluruh perangkat!');
+      }
+    }
   };
 
   // -------------------------------------------------------------------------

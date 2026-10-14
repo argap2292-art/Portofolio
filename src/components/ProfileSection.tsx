@@ -21,6 +21,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { ChangeProfilePhotoModal } from './ChangeProfilePhotoModal';
+import { uploadProfilePhoto, saveProfileAvatarToSupabase } from '../lib/supabase';
 
 interface ProfileSectionProps {
   profile: ProfileData;
@@ -28,7 +29,7 @@ interface ProfileSectionProps {
   onOpenLightbox: (imageUrl: string, title: string, description: string) => void;
   onOpenContact: () => void;
   onNavigateToPortfolio: () => void;
-  onUpdatePhoto?: (newUrl: string) => void;
+  onUpdatePhoto?: (newUrl: string) => Promise<boolean | void> | void;
 }
 
 export const ProfileSection: React.FC<ProfileSectionProps> = ({
@@ -40,17 +41,41 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
   onUpdatePhoto,
 }) => {
   const [isPhotoChangerOpen, setIsPhotoChangerOpen] = useState(false);
+  const [isUploadingDirect, setIsUploadingDirect] = useState(false);
 
-  const handleLocalUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLocalUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && onUpdatePhoto) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        if (ev.target?.result) {
-          onUpdatePhoto(ev.target.result as string);
+      setIsUploadingDirect(true);
+      try {
+        // Upload ke Supabase Storage bucket 'profil'
+        const uploadRes = await uploadProfilePhoto(file);
+        let finalUrl = '';
+        if (uploadRes.url) {
+          finalUrl = uploadRes.url;
+        } else {
+          // Fallback ke FileReader jika Storage belum siap
+          const reader = new FileReader();
+          await new Promise<void>((resolve) => {
+            reader.onload = (ev) => {
+              if (ev.target?.result) {
+                finalUrl = ev.target.result as string;
+              }
+              resolve();
+            };
+            reader.readAsDataURL(file);
+          });
         }
-      };
-      reader.readAsDataURL(file);
+
+        if (finalUrl) {
+          await saveProfileAvatarToSupabase(finalUrl);
+          await onUpdatePhoto(finalUrl);
+        }
+      } catch (err) {
+        console.error('Error uploading photo:', err);
+      } finally {
+        setIsUploadingDirect(false);
+      }
     }
   };
 
@@ -169,13 +194,18 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                       </div>
                     </div>
 
-                    <label className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer transition-colors">
-                      <Upload className="h-3.5 w-3.5 text-slate-600" />
-                      <span>Pilih File Langsung dari Galeri HP/PC</span>
+                    <label className={`w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
+                      isUploadingDirect
+                        ? 'bg-emerald-100 text-emerald-800 pointer-events-none'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}>
+                      <Upload className={`h-3.5 w-3.5 ${isUploadingDirect ? 'animate-bounce text-emerald-700' : 'text-slate-600'}`} />
+                      <span>{isUploadingDirect ? 'Mengunggah ke Supabase...' : 'Pilih File Langsung dari Galeri HP/PC'}</span>
                       <input
                         type="file"
                         accept="image/*"
                         className="hidden"
+                        disabled={isUploadingDirect}
                         onChange={handleLocalUpload}
                       />
                     </label>

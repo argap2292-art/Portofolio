@@ -7,6 +7,11 @@ export const SUPABASE_ANON_KEY =
 
 export const BUCKET_BERKAS_PUBLIKASI = 'berkas-publikasi';
 export const BUCKET_BERKAS_INOVASI = 'berkas-inovasi';
+export const BUCKET_PROFIL = 'profil';
+export const BUCKET_PROFIL_FALLBACK = 'foto-profil';
+
+export const TABLE_PENGATURAN_PROFIL = 'Pengaturan _Profil';
+export const TABLE_PENGATURAN_PROFIL_ALT = 'Pengaturan_Profil';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -468,3 +473,201 @@ export async function deleteInnovationFromSupabase(
     return { success: false, error: err };
   }
 }
+
+// ---------------------------------------------------------------------------
+// 4. PENGATURAN PROFIL & FOTO AVATAR (STORAGE & DATABASE SYNC)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mengunggah file gambar ke Supabase Storage bucket 'profil'.
+ * Jika bucket 'profil' belum dibuat atau mengalami kendala, mencoba fallback ke bucket 'foto-profil'.
+ */
+export async function uploadProfilePhoto(
+  fileOrBlob: File | Blob,
+  fileNameCustom?: string
+): Promise<{
+  url: string | null;
+  error: Error | null;
+  bucketNotFound?: boolean;
+  needsRlsFix?: boolean;
+}> {
+  try {
+    const ext =
+      fileOrBlob instanceof File
+        ? fileOrBlob.name.split('.').pop() || 'jpg'
+        : 'jpg';
+    const timestamp = Date.now();
+    const fileName = fileNameCustom || `avatar_${timestamp}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+    const contentType = fileOrBlob.type || 'image/jpeg';
+
+    // 1. Coba upload ke bucket 'profil'
+    let uploadRes = await supabase.storage
+      .from(BUCKET_PROFIL)
+      .upload(fileName, fileOrBlob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType,
+      });
+
+    // 2. Jika bucket 'profil' not found, coba bucket 'foto-profil'
+    let usedBucket = BUCKET_PROFIL;
+    if (
+      uploadRes.error &&
+      (uploadRes.error.message?.includes('Bucket not found') ||
+        (uploadRes.error as any).statusCode === '404' ||
+        (uploadRes.error as any).code === 'NoSuchBucket')
+    ) {
+      console.info(`[Supabase Storage] Bucket '${BUCKET_PROFIL}' tidak ditemukan, mencoba '${BUCKET_PROFIL_FALLBACK}'...`);
+      const fallbackRes = await supabase.storage
+        .from(BUCKET_PROFIL_FALLBACK)
+        .upload(fileName, fileOrBlob, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType,
+        });
+
+      if (!fallbackRes.error) {
+        uploadRes = fallbackRes;
+        usedBucket = BUCKET_PROFIL_FALLBACK;
+      }
+    }
+
+    if (uploadRes.error) {
+      console.warn('[Supabase Storage Profil] Upload error:', uploadRes.error.message);
+      const isBucketNotFound =
+        uploadRes.error.message?.includes('Bucket not found') ||
+        (uploadRes.error as any).statusCode === '404' ||
+        (uploadRes.error as any).code === 'NoSuchBucket';
+      const isRls =
+        uploadRes.error.message?.includes('violates row-level security') ||
+        (uploadRes.error as any).statusCode === '403' ||
+        (uploadRes.error as any).code === 'AccessDenied' ||
+        (uploadRes.error as any).code === '42501';
+
+      return {
+        url: null,
+        error: new Error(uploadRes.error.message),
+        bucketNotFound: isBucketNotFound,
+        needsRlsFix: isRls,
+      };
+    }
+
+    // Ambil Public URL dari file yang diunggah
+    const { data: pubData } = supabase.storage
+      .from(usedBucket)
+      .getPublicUrl(fileName);
+
+    return { url: pubData.publicUrl, error: null };
+  } catch (err: any) {
+    return { url: null, error: err };
+  }
+}
+
+/**
+ * Mengambil URL avatar terbaru dari tabel 'Pengaturan _Profil' / 'Pengaturan_Profil'.
+ */
+export async function fetchProfileAvatarFromSupabase(): Promise<{
+  avatarUrl: string | null;
+  error: Error | null;
+}> {
+  try {
+    // Coba tabel 'Pengaturan _Profil' (ada spasi)
+    let res = await supabase
+      .from(TABLE_PENGATURAN_PROFIL)
+      .select('avatar_url, id')
+      .order('id', { ascending: false })
+      .limit(1);
+
+    // Jika tabel tidak ditemukan, coba nama alternatif tanpa spasi
+    if (res.error && res.error.message.includes('in the schema cache')) {
+      res = await supabase
+        .from(TABLE_PENGATURAN_PROFIL_ALT)
+        .select('avatar_url, id')
+        .order('id', { ascending: false })
+        .limit(1);
+    }
+
+    if (res.error) {
+      console.warn('[Supabase] Gagal fetch avatar_url:', res.error.message);
+      return { avatarUrl: null, error: new Error(res.error.message) };
+    }
+
+    if (res.data && res.data.length > 0 && res.data[0].avatar_url) {
+      return { avatarUrl: res.data[0].avatar_url, error: null };
+    }
+
+    return { avatarUrl: null, error: null };
+  } catch (err: any) {
+    return { avatarUrl: null, error: err };
+  }
+}
+
+/**
+ * Menyimpan/memperbarui record avatar_url di tabel 'Pengaturan _Profil' / 'Pengaturan_Profil'.
+ */
+export async function saveProfileAvatarToSupabase(
+  avatarUrl: string
+): Promise<{
+  success: boolean;
+  error: Error | null;
+  needsRlsFix?: boolean;
+}> {
+  try {
+    // 1. Cek apakah sudah ada baris di Pengaturan _Profil
+    let checkRes = await supabase
+      .from(TABLE_PENGATURAN_PROFIL)
+      .select('id')
+      .order('id', { ascending: false })
+      .limit(1);
+
+    let activeTable = TABLE_PENGATURAN_PROFIL;
+
+    if (checkRes.error && checkRes.error.message.includes('in the schema cache')) {
+      activeTable = TABLE_PENGATURAN_PROFIL_ALT;
+      checkRes = await supabase
+        .from(TABLE_PENGATURAN_PROFIL_ALT)
+        .select('id')
+        .order('id', { ascending: false })
+        .limit(1);
+    }
+
+    if (checkRes.error && !checkRes.error.message.includes('in the schema cache')) {
+      // Periksa error RLS
+      const isRls = checkRes.error.code === '42501';
+      return { success: false, error: new Error(checkRes.error.message), needsRlsFix: isRls };
+    }
+
+    const existingRow = checkRes.data?.[0];
+
+    let saveRes;
+    if (existingRow?.id) {
+      // Update baris yang sudah ada
+      saveRes = await supabase
+        .from(activeTable)
+        .update({ avatar_url: avatarUrl })
+        .eq('id', existingRow.id)
+        .select();
+    } else {
+      // Insert baris pertama
+      saveRes = await supabase
+        .from(activeTable)
+        .insert([{ avatar_url: avatarUrl }])
+        .select();
+    }
+
+    if (saveRes.error) {
+      console.error('[Supabase] Gagal menyimpan avatar_url ke database:', saveRes.error);
+      return {
+        success: false,
+        error: new Error(saveRes.error.message),
+        needsRlsFix: saveRes.error.code === '42501',
+      };
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: false, error: err };
+  }
+}
+

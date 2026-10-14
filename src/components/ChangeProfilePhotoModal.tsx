@@ -9,14 +9,18 @@ import {
   Check, 
   AlertCircle,
   Sparkles,
-  Smartphone
+  Smartphone,
+  CloudUpload,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
+import { uploadProfilePhoto, saveProfileAvatarToSupabase } from '../lib/supabase';
 
 interface ChangeProfilePhotoModalProps {
   isOpen: boolean;
   currentPhotoUrl: string;
-  onSelectPhoto: (newUrl: string) => void;
-  onResetDefault: () => void;
+  onSelectPhoto: (newUrl: string) => Promise<boolean | void> | void;
+  onResetDefault: () => Promise<boolean | void> | void;
   onClose: () => void;
 }
 
@@ -29,14 +33,32 @@ export const ChangeProfilePhotoModal: React.FC<ChangeProfilePhotoModalProps> = (
 }) => {
   const [activeTab, setActiveTab] = useState<'device' | 'camera' | 'url' | 'presets'>('device');
   const [previewUrl, setPreviewUrl] = useState<string>(currentPhotoUrl);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [urlInput, setUrlInput] = useState<string>('');
   const [urlError, setUrlError] = useState<string>('');
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadStatusText, setUploadStatusText] = useState<string>('');
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
+  const [generalError, setGeneralError] = useState<string>('');
 
   // Camera stream refs & state
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string>('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setPreviewUrl(currentPhotoUrl);
+      setSelectedFile(null);
+      setCapturedBlob(null);
+      setUrlInput('');
+      setUrlError('');
+      setGeneralError('');
+      setIsSuccess(false);
+      setIsUploading(false);
+    }
+  }, [isOpen, currentPhotoUrl]);
 
   const presetPhotos = [
     {
@@ -81,6 +103,9 @@ export const ChangeProfilePhotoModal: React.FC<ChangeProfilePhotoModalProps> = (
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
+      setCapturedBlob(null);
+      setGeneralError('');
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
@@ -118,15 +143,27 @@ export const ChangeProfilePhotoModal: React.FC<ChangeProfilePhotoModalProps> = (
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-      setPreviewUrl(dataUrl);
-      stopCamera();
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            setCapturedBlob(blob);
+            setSelectedFile(null);
+            setGeneralError('');
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            setPreviewUrl(dataUrl);
+            stopCamera();
+          }
+        },
+        'image/jpeg',
+        0.92
+      );
     }
   };
 
   // Handle URL input
   const handleApplyUrl = () => {
     setUrlError('');
+    setGeneralError('');
     if (!urlInput.trim()) {
       setUrlError('Masukkan URL gambar terlebih dahulu.');
       return;
@@ -134,6 +171,8 @@ export const ChangeProfilePhotoModal: React.FC<ChangeProfilePhotoModalProps> = (
     const testImg = new Image();
     testImg.onload = () => {
       setPreviewUrl(urlInput.trim());
+      setSelectedFile(null);
+      setCapturedBlob(null);
     };
     testImg.onerror = () => {
       setUrlError('URL gambar tidak valid atau tidak dapat diakses secara publik.');
@@ -141,14 +180,84 @@ export const ChangeProfilePhotoModal: React.FC<ChangeProfilePhotoModalProps> = (
     testImg.src = urlInput.trim();
   };
 
-  // Save selected photo
-  const handleSavePhoto = () => {
-    onSelectPhoto(previewUrl);
-    setIsSuccess(true);
-    setTimeout(() => {
-      setIsSuccess(false);
+  // Save selected photo with automatic Supabase Storage & Database sync
+  const handleSavePhoto = async () => {
+    setIsUploading(true);
+    setGeneralError('');
+    setUploadStatusText('Menyiapkan foto profil...');
+
+    try {
+      let finalAvatarUrl = previewUrl;
+
+      // 1. Jika ada file dari perangkat atau jepretan kamera, unggah ke Supabase Storage bucket 'profil'
+      if (selectedFile || capturedBlob) {
+        setUploadStatusText('Mengunggah ke Supabase Storage (bucket "profil")...');
+        const uploadTarget = selectedFile || capturedBlob!;
+        const uploadRes = await uploadProfilePhoto(uploadTarget);
+
+        if (uploadRes.error) {
+          console.warn('[Supabase Storage] Gagal unggah:', uploadRes.error.message);
+          // Jika gagal unggah ke storage (misal RLS belum dibuka), tetap beritahu pengguna
+          setGeneralError(
+            `Peringatan Storage: ${uploadRes.error.message}. Foto diterapkan di sesi ini.`
+          );
+        } else if (uploadRes.url) {
+          finalAvatarUrl = uploadRes.url;
+        }
+      }
+
+      // 2. Simpan URL avatar ke tabel database Supabase ('Pengaturan _Profil')
+      setUploadStatusText('Menyimpan tautan foto ke database Supabase...');
+      const dbRes = await saveProfileAvatarToSupabase(finalAvatarUrl);
+
+      if (dbRes.error) {
+        console.warn('[Supabase DB] Gagal simpan ke tabel:', dbRes.error.message);
+        if (!generalError) {
+          setGeneralError(`Catatan Database: ${dbRes.error.message}`);
+        }
+      }
+
+      // 3. Panggil callback onSelectPhoto untuk memperbarui tampilan di seluruh halaman
+      await onSelectPhoto(finalAvatarUrl);
+
+      setIsSuccess(true);
+      setUploadStatusText('Foto profil berhasil disinkronkan ke Supabase!');
+
+      setTimeout(() => {
+        setIsSuccess(false);
+        setIsUploading(false);
+        onClose();
+      }, 1200);
+    } catch (err: any) {
+      console.error('Error saat menyimpan foto profil:', err);
+      setGeneralError(err.message || 'Terjadi kesalahan sistem.');
+      setIsUploading(false);
+    }
+  };
+
+  // Reset to default photo with Supabase sync
+  const handleResetToDefault = async () => {
+    setIsUploading(true);
+    setUploadStatusText('Mengembalikan ke foto profil resmi default...');
+    const defaultUrl = '/images/profil-resmi.jpg';
+    setPreviewUrl(defaultUrl);
+    setSelectedFile(null);
+    setCapturedBlob(null);
+
+    try {
+      await saveProfileAvatarToSupabase(defaultUrl);
+      await onResetDefault();
+      setIsSuccess(true);
+      setTimeout(() => {
+        setIsSuccess(false);
+        setIsUploading(false);
+        onClose();
+      }, 900);
+    } catch {
+      await onResetDefault();
+      setIsUploading(false);
       onClose();
-    }, 900);
+    }
   };
 
   return (
@@ -432,14 +541,34 @@ export const ChangeProfilePhotoModal: React.FC<ChangeProfilePhotoModalProps> = (
           </div>
         </div>
 
+        {/* Status & Error Feedback */}
+        {(uploadStatusText || generalError) && (
+          <div className="mt-4 p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+            {uploadStatusText && (
+              <div className="flex items-center gap-2 text-emerald-800 font-medium">
+                {isUploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-emerald-600 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                )}
+                <span>{uploadStatusText}</span>
+              </div>
+            )}
+            {generalError && (
+              <div className="flex items-start gap-2 mt-1.5 text-amber-700">
+                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <span>{generalError}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Footer Actions */}
-        <div className="mt-8 pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div className="mt-6 pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <button
-            onClick={() => {
-              onResetDefault();
-              setPreviewUrl('/images/profil-resmi.jpg');
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            onClick={handleResetToDefault}
+            disabled={isUploading}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-50 transition-colors"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             <span>Kembalikan ke Foto Default</span>
@@ -451,24 +580,30 @@ export const ChangeProfilePhotoModal: React.FC<ChangeProfilePhotoModalProps> = (
                 stopCamera();
                 onClose();
               }}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+              disabled={isUploading}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition-colors"
             >
               Batal
             </button>
             <button
               onClick={handleSavePhoto}
-              disabled={isSuccess}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-xs font-semibold shadow-sm transition-all"
+              disabled={isSuccess || isUploading}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-xs font-semibold shadow-sm disabled:opacity-60 transition-all cursor-pointer"
             >
-              {isSuccess ? (
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Menyimpan ke Supabase...</span>
+                </>
+              ) : isSuccess ? (
                 <>
                   <Check className="h-4 w-4" />
-                  <span>Foto Tersimpan!</span>
+                  <span>Foto Tersimpan Online!</span>
                 </>
               ) : (
                 <>
-                  <Check className="h-4 w-4" />
-                  <span>Terapkan Foto Ini</span>
+                  <CloudUpload className="h-4 w-4" />
+                  <span>Simpan & Sinkronkan Online</span>
                 </>
               )}
             </button>
