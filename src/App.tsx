@@ -314,13 +314,17 @@ export default function App() {
   };
 
   const handleUpdateInnovationPhoto = async (id: string, fileOrUrl: File | string) => {
-    showToast('Menyimpan foto inovasi ke Supabase Cloud...');
+    showToast('Mengunggah foto kegiatan ke Supabase Storage (Berkas Karya)...');
     const res = await updateInnovationPhotoInSupabase(id, fileOrUrl);
     if (!res.success && res.error) {
       console.warn('Gagal menyimpan foto:', res.error.message);
+      if (res.needsRlsFix) {
+        setShowRlsBanner(true);
+        setIsSupabaseModalOpen(true);
+      }
       showToast(`Gagal menyimpan foto: ${res.error.message}`);
     } else {
-      showToast('Foto karya inovasi berhasil disinkronkan ke Supabase!');
+      showToast('Foto kegiatan berhasil disimpan ke Supabase Storage dan terhubung ke kartu!');
       if (res.url) {
         setInnovations((prev) => {
           const updated = prev.map((item) =>

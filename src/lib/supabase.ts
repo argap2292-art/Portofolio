@@ -6,7 +6,8 @@ export const SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhubGNrZmZ5ZHV1amRpZHZ2cnRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4Mjg5NzIsImV4cCI6MjEwNzQwNDk3Mn0.8LLx590UrhfyeuJ34Ph-MdM99dNO54bLq8GklpvA-7g';
 
 export const BUCKET_BERKAS_PUBLIKASI = 'berkas-publikasi';
-export const BUCKET_BERKAS_INOVASI = 'berkas-inovasi';
+export const BUCKET_BERKAS_KARYA = 'Berkas Karya';
+export const BUCKET_BERKAS_INOVASI = 'Berkas Karya';
 export const BUCKET_PROFIL = 'profil';
 export const BUCKET_PROFIL_FALLBACK = 'foto-profil';
 
@@ -142,7 +143,11 @@ export function fileToCompressedDataUrl(
   });
 }
 
-export async function uploadInnovationFile(
+/**
+ * Mengunggah file foto/media karya inovasi ke Supabase Storage bucket 'Berkas Karya'.
+ * Mengembalikan Public URL dari file yang berhasil diunggah.
+ */
+export async function uploadInnovationPhotoToStorage(
   file: File
 ): Promise<{
   url: string | null;
@@ -151,49 +156,96 @@ export async function uploadInnovationFile(
   bucketNotFound?: boolean;
 }> {
   try {
-    const ext = file.name.split('.').pop() || 'bin';
+    const ext = file.name.split('.').pop() || 'jpg';
     const cleanBaseName = file.name
       .replace(/\.[^/.]+$/, '')
       .replace(/[^a-zA-Z0-9_-]/g, '_')
-      .slice(0, 40);
-    const fileName = `${Date.now()}_${cleanBaseName}.${ext}`;
+      .slice(0, 30);
+    const fileName = `karya_${Date.now()}_${cleanBaseName}.${ext}`;
 
-    const { error } = await supabase.storage
-      .from(BUCKET_BERKAS_INOVASI)
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: file.type || undefined,
-      });
+    // Target bucket utama adalah 'Berkas Karya' (sesuai bucket user di Supabase)
+    const candidateBuckets = [
+      BUCKET_BERKAS_KARYA, // 'Berkas Karya'
+      'berkas-karya',
+      'Berkas_Karya',
+      'berkas-inovasi',
+      'profil',
+    ];
 
-    if (error) {
-      console.warn('[Supabase Storage berkas-inovasi] Gagal upload:', error.message);
-      const isBucketNotFound =
+    let lastError: any = null;
+    let successfulBucket: string | null = null;
+
+    for (const b of candidateBuckets) {
+      const { error } = await supabase.storage
+        .from(b)
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: file.type || 'image/jpeg',
+        });
+
+      if (!error) {
+        successfulBucket = b;
+        break;
+      }
+
+      lastError = error;
+      const isNotFound =
         error.message?.includes('Bucket not found') ||
         (error as any).statusCode === '404' ||
         (error as any).code === 'NoSuchBucket';
+
+      // Jika bucket ditemukan namun ditolak karena RLS, hentikan loop pada bucket tersebut
+      if (!isNotFound) {
+        break;
+      }
+    }
+
+    if (!successfulBucket) {
+      console.warn('[Supabase Storage Berkas Karya] Gagal upload:', lastError?.message);
+      const isBucketNotFound =
+        lastError?.message?.includes('Bucket not found') ||
+        (lastError as any)?.statusCode === '404' ||
+        (lastError as any)?.code === 'NoSuchBucket';
       const isRls =
-        error.message?.includes('violates row-level security') ||
-        (error as any).statusCode === '403' ||
-        (error as any).code === 'AccessDenied' ||
-        (error as any).code === '42501';
+        lastError?.message?.includes('violates row-level security') ||
+        (lastError as any)?.statusCode === '403' ||
+        (lastError as any)?.code === 'AccessDenied' ||
+        (lastError as any)?.code === '42501';
 
       return {
         url: null,
-        error: new Error(error.message),
+        error: new Error(
+          isRls
+            ? `Supabase Storage bucket '${BUCKET_BERKAS_KARYA}' memerlukan izin policy RLS publik (INSERT anon). Buka Status Supabase untuk melihat SQL fix.`
+            : isBucketNotFound
+            ? `Bucket '${BUCKET_BERKAS_KARYA}' belum dibuat di Supabase Storage.`
+            : (lastError?.message || 'Gagal mengunggah foto ke Supabase Storage.')
+        ),
         bucketNotFound: isBucketNotFound,
         needsRlsFix: isRls,
       };
     }
 
     const { data: pubData } = supabase.storage
-      .from(BUCKET_BERKAS_INOVASI)
+      .from(successfulBucket)
       .getPublicUrl(fileName);
 
     return { url: pubData.publicUrl, error: null };
   } catch (err: any) {
     return { url: null, error: err };
   }
+}
+
+export async function uploadInnovationFile(
+  file: File
+): Promise<{
+  url: string | null;
+  error: Error | null;
+  needsRlsFix?: boolean;
+  bucketNotFound?: boolean;
+}> {
+  return uploadInnovationPhotoToStorage(file);
 }
 
 // ---------------------------------------------------------------------------
@@ -426,11 +478,16 @@ export function resolveInnovationMedia(row: any): {
   }
 
   // Jika tautan adalah file gambar online atau Supabase Storage URL
+  const isSupabaseStorage =
+    rawLink.includes('/storage/v1/object/public/') ||
+    rawLink.includes('supabase.co/storage/');
+  const isDocFile = /\.(pdf|docx?|xlsx?|pptx?|zip|rar)($|\?|#)/i.test(rawLink);
+
   if (
     !resolvedImageUrl &&
     (
+      (isSupabaseStorage && !isDocFile) ||
       /\.(jpeg|jpg|png|gif|webp|svg|bmp|avif)($|\?|#)/i.test(rawLink) ||
-      rawLink.includes('/storage/v1/object/public/') ||
       rawLink.includes('images.unsplash.com') ||
       rawLink.includes('imgur.com')
     )
@@ -527,35 +584,23 @@ export async function insertInnovationToSupabase(
     let finalExternalUrl = item.externalLink || item.documentUrl || '';
     let storageWarning: string | null = null;
 
-    // 1. Jika ada file dokumen/media yang dipilih, unggah ke Storage bucket "berkas-inovasi"
+    // 1. Jika ada file dokumen/media yang dipilih, unggah ke Storage bucket 'Berkas Karya'
     if (file) {
-      console.info('[Supabase Storage] Mengunggah berkas ke bucket berkas-inovasi...');
-      const uploadRes = await uploadInnovationFile(file);
+      console.info(`[Supabase Storage] Mengunggah berkas ke bucket '${BUCKET_BERKAS_KARYA}'...`);
+      const uploadRes = await uploadInnovationPhotoToStorage(file);
       if (uploadRes.url) {
         finalExternalUrl = uploadRes.url;
       } else {
         console.warn('[Supabase Storage] Gagal mengunggah file inovasi:', uploadRes.error?.message);
-        // Fallback cerdas: Jika file adalah gambar, kompres dan simpan sebagai base64 Data URL langsung ke database
-        if (file.type.startsWith('image/')) {
-          try {
-            const compressed = await fileToCompressedDataUrl(file);
-            finalExternalUrl = compressed;
-            storageWarning = uploadRes.bucketNotFound
-              ? `Foto disimpan langsung ke database (bucket '${BUCKET_BERKAS_INOVASI}' belum dibuat).`
-              : `Foto disimpan ke database (${uploadRes.error?.message || 'Storage error'}).`;
-          } catch (_) {
-            if (item.imageUrl) finalExternalUrl = item.imageUrl;
-          }
-        } else if (item.imageUrl) {
-          finalExternalUrl = item.imageUrl;
-        } else {
-          storageWarning = uploadRes.bucketNotFound
-            ? `Bucket '${BUCKET_BERKAS_INOVASI}' belum dibuat di Supabase Storage.`
-            : `Gagal mengunggah file ke Storage: ${uploadRes.error?.message}`;
-        }
+        // PENTING: JANGAN simpan Base64 ke database karena index Postgres btree memiliki batas 8191 bytes.
+        storageWarning = uploadRes.needsRlsFix
+          ? `Izin RLS upload belum aktif pada bucket '${BUCKET_BERKAS_KARYA}'. Data disimpan tanpa lampiran file online.`
+          : uploadRes.bucketNotFound
+          ? `Bucket '${BUCKET_BERKAS_KARYA}' belum dibuat di Supabase Storage.`
+          : `Gagal upload ke Storage: ${uploadRes.error?.message}`;
       }
-    } else if (item.imageUrl && !finalExternalUrl) {
-      // Jika pengguna menyertakan gambar preview atau tautan gambar
+    } else if (item.imageUrl && !item.imageUrl.startsWith('data:')) {
+      // Jika pengguna menyertakan URL gambar online valid (bukan data: URL)
       finalExternalUrl = item.imageUrl;
     }
 
@@ -606,7 +651,6 @@ export async function insertInnovationToSupabase(
 
     const insertedRow = res.data?.[0];
     const isImageFile =
-      finalExternalUrl?.startsWith('data:image/') ||
       finalExternalUrl?.match(/\.(jpeg|jpg|png|gif|webp|svg|bmp|avif)($|\?|#)/i) ||
       finalExternalUrl?.includes('/storage/v1/object/public/');
 
@@ -626,31 +670,47 @@ export async function insertInnovationToSupabase(
 
 /**
  * Memperbarui foto sampul / tautan gambar untuk kartu Karya Inovasi yang sudah ada di Supabase.
+ * File diunggah ke Supabase Storage bucket 'Berkas Karya' dan string Public URL disimpan ke tabel database.
  */
 export async function updateInnovationPhotoInSupabase(
   id: string,
   fileOrUrl: File | string
-): Promise<{ success: boolean; url?: string; error: Error | null }> {
+): Promise<{ success: boolean; url?: string; error: Error | null; needsRlsFix?: boolean }> {
   try {
     let finalUrl = '';
 
     if (typeof fileOrUrl === 'string') {
-      finalUrl = fileOrUrl.trim();
-    } else {
-      // Coba upload ke Supabase Storage terlebih dahulu
-      const uploadRes = await uploadInnovationFile(fileOrUrl);
-      if (uploadRes.url) {
-        finalUrl = uploadRes.url;
-      } else {
-        // Fallback: kompres ke base64 data URL
-        finalUrl = await fileToCompressedDataUrl(fileOrUrl);
+      const trimmed = fileOrUrl.trim();
+      // Jangan izinkan string base64 besar disimpan ke tabel database karena batas ukuran index PostgreSQL
+      if (trimmed.startsWith('data:') && trimmed.length > 4000) {
+        return {
+          success: false,
+          error: new Error(
+            'Ukuran data Base64 terlalu besar untuk disimpan langsung ke database. Harap unggah berkas gambar lewat tombol Unggah Foto agar tersimpan ke Supabase Storage.'
+          ),
+        };
       }
+      finalUrl = trimmed;
+    } else {
+      // 1. Unggah file gambar ke Supabase Storage bucket 'Berkas Karya'
+      console.info(`[Supabase Storage] Mengunggah foto kegiatan ke bucket '${BUCKET_BERKAS_KARYA}'...`);
+      const uploadRes = await uploadInnovationPhotoToStorage(fileOrUrl);
+      if (uploadRes.error || !uploadRes.url) {
+        // HENTIKAN di sini dan laporkan error. JANGAN simpan Base64 mentah ke tabel database!
+        return {
+          success: false,
+          error: uploadRes.error || new Error('Gagal mendapatkan Public URL dari Supabase Storage.'),
+          needsRlsFix: uploadRes.needsRlsFix,
+        };
+      }
+      finalUrl = uploadRes.url;
     }
 
     if (!finalUrl) {
       return { success: false, error: new Error('Tautan atau berkas gambar tidak valid.') };
     }
 
+    // 2. Simpan string Public URL ke kolom database tabel 'Karya Inovasi'
     const numericId = Number(id);
     const query = Number.isFinite(numericId)
       ? supabase.from('Karya Inovasi').update({ 'Tautan Eksternal/Dok': finalUrl }).eq('id', numericId).select()
@@ -659,7 +719,11 @@ export async function updateInnovationPhotoInSupabase(
     const { data, error } = await query;
     if (error) {
       console.warn('[Supabase] Gagal update foto Karya Inovasi:', error.message);
-      return { success: false, error: new Error(error.message) };
+      return {
+        success: false,
+        error: new Error(error.message),
+        needsRlsFix: error.code === '42501',
+      };
     }
 
     return { success: true, url: finalUrl, error: null };

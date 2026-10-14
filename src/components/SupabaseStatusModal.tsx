@@ -88,7 +88,24 @@ DROP POLICY IF EXISTS "Upload Publik Berkas Publikasi" ON storage.objects;
 CREATE POLICY "Upload Publik Berkas Publikasi" ON storage.objects
   FOR INSERT TO anon WITH CHECK (bucket_id = 'berkas-publikasi');
 
--- 5. Konfigurasi Supabase Storage Bucket "berkas-inovasi" untuk Dokumen/Media
+-- 5. Konfigurasi Supabase Storage Bucket "Berkas Karya" untuk Foto Kegiatan & Karya Inovasi
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('Berkas Karya', 'Berkas Karya', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Akses Publik Berkas Karya" ON storage.objects;
+CREATE POLICY "Akses Publik Berkas Karya" ON storage.objects
+  FOR SELECT TO anon USING (bucket_id = 'Berkas Karya');
+
+DROP POLICY IF EXISTS "Upload Publik Berkas Karya" ON storage.objects;
+CREATE POLICY "Upload Publik Berkas Karya" ON storage.objects
+  FOR INSERT TO anon WITH CHECK (bucket_id = 'Berkas Karya');
+
+DROP POLICY IF EXISTS "Update Publik Berkas Karya" ON storage.objects;
+CREATE POLICY "Update Publik Berkas Karya" ON storage.objects
+  FOR UPDATE TO anon USING (bucket_id = 'Berkas Karya');
+
+-- 6. Konfigurasi Tambahan Bucket "berkas-inovasi" (fallback)
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('berkas-inovasi', 'berkas-inovasi', true)
 ON CONFLICT (id) DO UPDATE SET public = true;

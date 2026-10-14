@@ -28,7 +28,8 @@ import {
   ChevronDown,
   Camera,
   FolderGit2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  CheckCircle2
 } from 'lucide-react';
 
 interface PortfolioSectionProps {
@@ -671,13 +672,23 @@ export const PortfolioSection: React.FC<PortfolioSectionProps> = ({
                             </div>
 
                             {/* Badges di Sudut Kiri Bawah Foto */}
-                            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                            <div className="absolute bottom-3 left-3 flex items-center gap-2 flex-wrap">
                               <span className="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md bg-emerald-700/90 text-white backdrop-blur-md shadow-sm">
                                 {item.year}
                               </span>
                               <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-black/60 text-slate-200 backdrop-blur-md border border-white/10 hidden sm:inline">
                                 {categoryLabels[item.category] || item.category}
                               </span>
+                              {Boolean(
+                                item.imageUrl?.includes('/storage/v1/object/public/') ||
+                                item.imageUrl?.includes('Berkas%20Karya') ||
+                                item.imageUrl?.includes('Berkas Karya')
+                              ) && (
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md flex items-center gap-1 shadow-sm">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                                  <span>Supabase Storage</span>
+                                </span>
+                              )}
                             </div>
                           </div>
                         ) : isDrive ? (
@@ -786,17 +797,19 @@ export const PortfolioSection: React.FC<PortfolioSectionProps> = ({
                               </span>
 
                               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                                {item.externalLink && (
-                                  <a
-                                    href={item.externalLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-medium"
-                                  >
-                                    <span>{isDrive ? 'Buka Google Drive' : 'Buka Tautan'}</span>
-                                    <ExternalLink className="h-3 w-3" />
-                                  </a>
-                                )}
+                                {item.externalLink &&
+                                  !item.externalLink.includes('/storage/v1/object/public/') &&
+                                  !/\.(jpeg|jpg|png|webp|gif|bmp|avif)($|\?)/i.test(item.externalLink) && (
+                                    <a
+                                      href={item.externalLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-medium"
+                                    >
+                                      <span>{isDrive ? 'Buka Google Drive' : 'Buka Tautan Dokumen'}</span>
+                                      <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                  )}
 
                                 {onUpdateInnovationPhoto && (
                                   <button
