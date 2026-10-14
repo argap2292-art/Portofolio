@@ -46,6 +46,9 @@ export interface ProfileData {
   titleDegree: string;
   shortGreeting: string;
   mottoQuote: string;
+  mottoArabic?: string;
+  mottoTranslation?: string;
+  mottoSource?: string;
   birthPlaceAndDate: string;
   currentAddress: string;
   hobbies: string[];

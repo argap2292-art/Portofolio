@@ -418,6 +418,32 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
               </div>
             </div>
 
+            {/* Motto & Hadis Pedoman Hidup */}
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-800/80 bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 text-white p-6 sm:p-7 shadow-md text-center">
+              <div className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-300 mb-2">
+                <Quote className="h-4 w-4 text-emerald-400" />
+                <span>Motto & Hadis Pedoman Hidup</span>
+              </div>
+              
+              <p
+                dir="rtl"
+                lang="ar"
+                className="text-2xl sm:text-3xl font-serif text-amber-300 tracking-wide leading-loose my-2 select-all"
+                style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
+              >
+                خَيْرُ النَّاسِ أَنْفَعُهُمْ لِلنَّاسِ
+              </p>
+
+              <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent mx-auto my-2.5 opacity-80" />
+
+              <p className="text-sm sm:text-base italic text-emerald-100 font-normal leading-relaxed">
+                “Sebaik-baik manusia adalah yang paling bermanfaat bagi manusia lainnya.”
+              </p>
+              <p className="mt-1 text-xs text-emerald-300/90 font-medium italic">
+                (HR. Ahmad)
+              </p>
+            </div>
+
             {/* Motivasi Hidup (Kutipan Filosofis Jawa) */}
             <div className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/70 via-amber-50/30 to-orange-50/40 p-6 sm:p-7 shadow-xs">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-900 mb-2">

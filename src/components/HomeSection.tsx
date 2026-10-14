@@ -118,13 +118,34 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
             <p className="text-lg sm:text-xl font-medium text-slate-300">
               Arga Putra Pratama
             </p>
-          </div>
 
-          {/* Kalimat Mutiara / Motivasi Hidup */}
-          <div className="relative pl-5 py-2 border-l-2 border-emerald-400/80">
-            <blockquote className="text-xl sm:text-2xl lg:text-3xl font-serif-display italic text-emerald-100 leading-relaxed text-balance drop-shadow-xs">
-              “Berproses dengan ikhlas, mengabdi dengan hati, dan terus menebar manfaat.”
-            </blockquote>
+            {/* Kutipan Hadis Motto / Motivasi Hidup (Persis & Langsung di Bawah Nama Arga Putra Pratama) */}
+            <div className="pt-3 pb-1">
+              <div className="w-full max-w-2xl text-center bg-slate-900/70 border border-emerald-400/40 backdrop-blur-md rounded-2xl p-5 sm:p-6 shadow-xl shadow-slate-950/50">
+                {/* Teks Arab Elegan */}
+                <p
+                  dir="rtl"
+                  lang="ar"
+                  className="text-2xl sm:text-3xl lg:text-4xl font-serif text-amber-300 tracking-wide leading-loose drop-shadow-sm select-all"
+                  style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
+                >
+                  خَيْرُ النَّاسِ أَنْفَعُهُمْ لِلنَّاسِ
+                </p>
+
+                {/* Garis Pembatas Halus */}
+                <div className="w-20 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent mx-auto my-3 opacity-80" />
+
+                {/* Terjemahan Tulisan Miring (Italic) */}
+                <p className="text-sm sm:text-base lg:text-lg italic text-emerald-100 font-normal leading-relaxed text-balance">
+                  “Sebaik-baik manusia adalah yang paling bermanfaat bagi manusia lainnya.”
+                </p>
+
+                {/* Riwayat Hadis */}
+                <p className="mt-1.5 text-xs sm:text-sm font-medium text-emerald-300/90 italic tracking-wide">
+                  (HR. Ahmad)
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Deskripsi Pengabdian & Peran */}
