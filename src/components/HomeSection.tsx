@@ -108,50 +108,58 @@ export const HomeSection: React.FC<HomeSectionProps> = ({
           </div>
         </div>
 
-        {/* Core Hero Typography */}
-        <div className="max-w-3xl space-y-6">
-          {/* Sapaan Personal: "Hai, namaku Arga." */}
-          <div className="space-y-2">
-            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-white drop-shadow-sm font-sans-body">
+        {/* Core Hero 2-Column Grid (Desktop 50:50, Mobile Stacked & Centered) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+          
+          {/* KOLOM KIRI (Identitas & Deskripsi Diri) */}
+          <div className="flex flex-col text-center lg:text-left space-y-4 sm:space-y-5">
+            {/* Teks Sapaan Utama */}
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white drop-shadow-sm font-sans-body">
               Hai, namaku <span className="text-emerald-400 font-serif-display italic">Arga</span>.
             </h1>
-            <p className="text-lg sm:text-xl font-medium text-slate-300">
+
+            {/* Teks Nama Lengkap */}
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-wide drop-shadow-md">
               Arga Putra Pratama
+            </h2>
+
+            {/* Paragraf Deskripsi Lengkap */}
+            <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-xl mx-auto lg:mx-0">
+              Guru Pendidikan Agama Islam (PAI) dan praktisi inovasi pembelajaran interaktif. Berkomitmen membentuk generasi berakhlak mulia, tangguh, mandiri melalui penguatan karakter dan sentuhan teknologi digital di ruang kelas.
             </p>
-
-            {/* Kutipan Hadis Motto / Motivasi Hidup (Persis & Langsung di Bawah Nama Arga Putra Pratama) */}
-            <div className="pt-3 pb-1">
-              <div className="w-full max-w-2xl text-center bg-slate-900/70 border border-emerald-400/40 backdrop-blur-md rounded-2xl p-5 sm:p-6 shadow-xl shadow-slate-950/50">
-                {/* Teks Arab Elegan */}
-                <p
-                  dir="rtl"
-                  lang="ar"
-                  className="text-2xl sm:text-3xl lg:text-4xl font-serif text-amber-300 tracking-wide leading-loose drop-shadow-sm select-all"
-                  style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
-                >
-                  خَيْرُ النَّاسِ أَنْفَعُهُمْ لِلنَّاسِ
-                </p>
-
-                {/* Garis Pembatas Halus */}
-                <div className="w-20 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent mx-auto my-3 opacity-80" />
-
-                {/* Terjemahan Tulisan Miring (Italic) */}
-                <p className="text-sm sm:text-base lg:text-lg italic text-emerald-100 font-normal leading-relaxed text-balance">
-                  “Sebaik-baik manusia adalah yang paling bermanfaat bagi manusia lainnya.”
-                </p>
-
-                {/* Riwayat Hadis */}
-                <p className="mt-1.5 text-xs sm:text-sm font-medium text-emerald-300/90 italic tracking-wide">
-                  (HR. Ahmad)
-                </p>
-              </div>
-            </div>
           </div>
 
-          {/* Deskripsi Pengabdian & Peran */}
-          <p className="text-base sm:text-lg text-slate-300/90 leading-relaxed max-w-2xl">
-            Guru Pendidikan Agama Islam (PAI) dan praktisi inovasi pembelajaran interaktif. Berkomitmen membentuk generasi berakhlak mulia, tangguh, mandiri melalui penguatan karakter dan sentuhan teknologi digital di ruang kelas.
-          </p>
+          {/* KOLOM KANAN (Kartu Hadis Glassmorphism) */}
+          <div className="flex items-center justify-center lg:justify-end w-full">
+            <div className="w-full max-w-lg relative overflow-hidden rounded-3xl bg-slate-900/60 border border-emerald-400/30 backdrop-blur-xl p-6 sm:p-8 shadow-2xl shadow-emerald-950/40 text-center transition-all hover:border-emerald-400/50">
+              {/* Subtle decorative glow accents for glassmorphism */}
+              <div className="absolute -top-16 -right-16 w-36 h-36 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none" />
+              <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+              {/* Teks Arab Elegan */}
+              <p
+                dir="rtl"
+                lang="ar"
+                className="text-2xl sm:text-3xl lg:text-4xl font-serif text-amber-300 tracking-wide leading-loose drop-shadow-sm select-all"
+                style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
+              >
+                خَيْرُ النَّاسِ أَنْفَعُهُمْ لِلنَّاسِ
+              </p>
+
+              {/* Garis Pembatas Halus */}
+              <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-emerald-400/80 to-transparent mx-auto my-4 opacity-90" />
+
+              {/* Terjemahan Tulisan Miring (Italic & Center) */}
+              <p className="text-sm sm:text-base lg:text-lg italic text-emerald-100 font-normal leading-relaxed text-balance">
+                “Sebaik-baik manusia adalah yang paling bermanfaat bagi manusia lainnya.”
+              </p>
+
+              {/* Riwayat Hadis */}
+              <p className="mt-2 text-xs sm:text-sm font-medium text-emerald-300/90 italic tracking-wide">
+                (HR. Ahmad)
+              </p>
+            </div>
+          </div>
 
         </div>
 
