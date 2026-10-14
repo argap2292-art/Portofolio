@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PublicationItem } from '../types';
 import { 
   BookOpen, 
@@ -16,7 +16,9 @@ import {
   Trash2,
   Loader2,
   UploadCloud,
-  AlertCircle
+  AlertCircle,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
 interface PublicationSectionProps {
@@ -54,6 +56,49 @@ export const PublicationSection: React.FC<PublicationSectionProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Scroll navigation state for the modal form
+  const formScrollRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(true);
+
+  const handleScrollCheck = () => {
+    const el = formScrollRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    setCanScrollUp(scrollTop > 20);
+    setCanScrollDown(scrollTop + clientHeight < scrollHeight - 20);
+  };
+
+  useEffect(() => {
+    if (isAddModalOpen) {
+      const timer = setTimeout(() => {
+        handleScrollCheck();
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      setCanScrollUp(false);
+      setCanScrollDown(true);
+    }
+  }, [isAddModalOpen]);
+
+  const handleScrollToTop = () => {
+    if (formScrollRef.current) {
+      formScrollRef.current.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  const handleScrollToBottom = () => {
+    if (formScrollRef.current) {
+      formScrollRef.current.scrollTo({
+        top: formScrollRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
@@ -470,219 +515,265 @@ export const PublicationSection: React.FC<PublicationSectionProps> = ({
 
       {/* MODAL: TAMBAH PUBLIKASI BARU */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-xl rounded-2xl bg-white border border-slate-200 shadow-2xl p-6 sm:p-7 text-slate-900">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in overflow-hidden">
+          <div className="relative w-full max-w-xl max-h-[90vh] sm:max-h-[85vh] rounded-2xl bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden text-slate-900">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-5 sm:p-6 pb-4 border-b border-slate-200 shrink-0 bg-white">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-emerald-700" />
                 <h3 className="text-lg font-bold text-slate-900">Unggah / Lampirkan Publikasi Ilmiah</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg transition-colors cursor-pointer"
+                title="Tutup Modal"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSubmitNew} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Judul Karya Ilmiah / Jurnal / Tesis *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Misal: Efektivitas Media Pembelajaran Interaktif..."
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Scrollable Form Body with overflow-y: auto & responsive max-height */}
+            <div 
+              ref={formScrollRef}
+              onScroll={handleScrollCheck}
+              className="overflow-y-auto px-5 sm:px-6 py-4 flex-1 scroll-smooth"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              <form onSubmit={handleSubmitNew} className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Jenis Karya
-                  </label>
-                  <select
-                    value={newType}
-                    onChange={(e) => setNewType(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                  >
-                    <option value="Tesis">Tesis Magister (S-2)</option>
-                    <option value="Skripsi">Skripsi Sarjana (S-1)</option>
-                    <option value="Jurnal">Artikel Jurnal Ilmiah</option>
-                    <option value="Prosiding">Prosiding Seminar</option>
-                    <option value="Buku / Modul">Buku / Modul Ajar</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Tahun Terbit / Disahkan
+                    Judul Karya Ilmiah / Jurnal / Tesis *
                   </label>
                   <input
                     type="text"
-                    placeholder="2025"
-                    value={newYear}
-                    onChange={(e) => setNewYear(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Penerbit / Institusi / Nama Jurnal
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="UIN Ponorogo / Jurnal Tarbiyah..."
-                    value={newPublisher}
-                    onChange={(e) => setNewPublisher(e.target.value)}
+                    required
+                    placeholder="Misal: Efektivitas Media Pembelajaran Interaktif..."
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Nomor ISSN / DOI (Opsional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="ISSN 2745-9821 atau 10.1234/..."
-                    value={newDoi}
-                    onChange={(e) => setNewDoi(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Abstrak / Ringkasan Penelitian
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Tuliskan latar belakang singkat, metodologi, dan temuan utama..."
-                  value={newAbstract}
-                  onChange={(e) => setNewAbstract(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Tautan File / Link Repository Luar (Opsional)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://etheses.iainponorogo.ac.id/... atau Google Drive"
-                  value={newLink}
-                  onChange={(e) => setNewLink(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Lampirkan Berkas PDF (Unggah ke Supabase Storage "berkas-publikasi")
-                </label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    onChange={handleFileUpload}
-                    disabled={isSubmitting}
-                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:bg-slate-900 file:text-white file:text-xs hover:file:bg-slate-800 cursor-pointer disabled:opacity-50"
-                  />
-                </div>
-                {selectedFile && (
-                  <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 text-emerald-800 truncate mr-2">
-                      <FileText className="h-4 w-4 text-emerald-600 shrink-0" />
-                      <span className="font-medium truncate">{selectedFile.name}</span>
-                      <span className="text-[11px] text-emerald-600 shrink-0">
-                        ({(selectedFile.size / 1024).toFixed(1)} KB)
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleClearFile}
-                      disabled={isSubmitting}
-                      className="text-slate-400 hover:text-rose-600 p-1 rounded font-bold"
-                      title="Batalkan pilihan file"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Jenis Karya
+                    </label>
+                    <select
+                      value={newType}
+                      onChange={(e) => setNewType(e.target.value as any)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     >
-                      ✕
-                    </button>
+                      <option value="Tesis">Tesis Magister (S-2)</option>
+                      <option value="Skripsi">Skripsi Sarjana (S-1)</option>
+                      <option value="Jurnal">Artikel Jurnal Ilmiah</option>
+                      <option value="Prosiding">Prosiding Seminar</option>
+                      <option value="Buku / Modul">Buku / Modul Ajar</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Tahun Terbit / Disahkan
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="2025"
+                      value={newYear}
+                      onChange={(e) => setNewYear(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Penerbit / Institusi / Nama Jurnal
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="UIN Ponorogo / Jurnal Tarbiyah..."
+                      value={newPublisher}
+                      onChange={(e) => setNewPublisher(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Nomor ISSN / DOI (Opsional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="ISSN 2745-9821 atau 10.1234/..."
+                      value={newDoi}
+                      onChange={(e) => setNewDoi(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Abstrak / Ringkasan Penelitian
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Tuliskan latar belakang singkat, metodologi, dan temuan utama..."
+                    value={newAbstract}
+                    onChange={(e) => setNewAbstract(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Tautan File / Link Repository Luar (Opsional)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://etheses.iainponorogo.ac.id/... atau Google Drive"
+                    value={newLink}
+                    onChange={(e) => setNewLink(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Lampirkan Berkas PDF (Unggah ke Supabase Storage "berkas-publikasi")
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      onChange={handleFileUpload}
+                      disabled={isSubmitting}
+                      className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:bg-slate-900 file:text-white file:text-xs hover:file:bg-slate-800 cursor-pointer disabled:opacity-50"
+                    />
+                  </div>
+                  {selectedFile && (
+                    <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 text-emerald-800 truncate mr-2">
+                        <FileText className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <span className="font-medium truncate">{selectedFile.name}</span>
+                        <span className="text-[11px] text-emerald-600 shrink-0">
+                          ({(selectedFile.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleClearFile}
+                        disabled={isSubmitting}
+                        className="text-slate-400 hover:text-rose-600 p-1 rounded font-bold cursor-pointer"
+                        title="Batalkan pilihan file"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Format didukung: Dokumen PDF (.pdf). File akan diunggah ke bucket storage Supabase dan tautan publiknya otomatis disimpan ke kolom <code>'Tautan File'</code>.
+                  </p>
+                </div>
+
+                {/* Status Message while Submitting */}
+                {submitStatus && (
+                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs flex items-center gap-2.5 animate-pulse">
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600 shrink-0" />
+                    <span>{submitStatus}</span>
                   </div>
                 )}
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Format didukung: Dokumen PDF (.pdf). File akan diunggah ke bucket storage Supabase dan tautan publiknya otomatis disimpan ke kolom <code>'Tautan File'</code>.
-                </p>
-              </div>
 
-              {/* Status Message while Submitting */}
-              {submitStatus && (
-                <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs flex items-center gap-2.5 animate-pulse">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600 shrink-0" />
-                  <span>{submitStatus}</span>
-                </div>
-              )}
-
-              {/* Error Message */}
-              {formError && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1.5">
-                  <div className="font-semibold flex items-center gap-1.5">
-                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-                    <span>Gagal Menyimpan ke Supabase</span>
+                {/* Error Message */}
+                {formError && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1.5">
+                    <div className="font-semibold flex items-center gap-1.5">
+                      <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                      <span>Gagal Menyimpan ke Supabase</span>
+                    </div>
+                    <p className="leading-relaxed">{formError}</p>
+                    {onOpenSupabaseStatus && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddModalOpen(false);
+                          onOpenSupabaseStatus();
+                        }}
+                        className="inline-flex items-center gap-1 text-xs text-emerald-700 font-semibold underline hover:text-emerald-800 mt-1"
+                      >
+                        Buka Panduan SQL & Konfigurasi Supabase
+                      </button>
+                    )}
                   </div>
-                  <p className="leading-relaxed">{formError}</p>
-                  {onOpenSupabaseStatus && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAddModalOpen(false);
-                        onOpenSupabaseStatus();
-                      }}
-                      className="inline-flex items-center gap-1 text-xs text-emerald-700 font-semibold underline hover:text-emerald-800 mt-1"
-                    >
-                      Buka Panduan SQL & Konfigurasi Supabase
-                    </button>
-                  )}
-                </div>
-              )}
+                )}
 
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  disabled={isSubmitting}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 disabled:opacity-50"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm disabled:opacity-60 transition-all cursor-pointer"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      <span>Sedang Menyimpan...</span>
-                    </>
-                  ) : (
-                    <>
-                      <UploadCloud className="h-4 w-4" />
-                      <span>Simpan ke Supabase</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+                <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(false)}
+                    disabled={isSubmitting}
+                    className="px-4 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 disabled:opacity-50 cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-sm disabled:opacity-60 transition-all cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Sedang Menyimpan...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="h-4 w-4" />
+                        <span>Simpan ke Supabase</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Tombol Navigasi Scroll Melayang (Scroll to Top & Scroll to Bottom) */}
+            <div 
+              className="absolute right-3.5 sm:right-5 bottom-20 z-30 flex flex-col gap-1 p-1 rounded-2xl bg-slate-900/90 text-white shadow-xl backdrop-blur-md border border-slate-700/60 transition-all"
+              role="group"
+              aria-label="Navigasi gulir formulir"
+            >
+              <button
+                type="button"
+                onClick={handleScrollToTop}
+                title="Gulir ke Bagian Atas Formulir (Judul)"
+                aria-label="Gulir ke Bagian Atas Formulir"
+                className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
+                  canScrollUp 
+                    ? 'text-white hover:bg-emerald-600 active:scale-95' 
+                    : 'text-slate-500 hover:text-slate-300 opacity-60'
+                }`}
+              >
+                <ChevronUp className="h-4 w-4" />
+              </button>
+              <div className="h-px w-3 bg-slate-700 mx-auto" />
+              <button
+                type="button"
+                onClick={handleScrollToBottom}
+                title="Gulir ke Bagian Bawah Formulir (Tombol Simpan & Berkas)"
+                aria-label="Gulir ke Bagian Bawah Formulir"
+                className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${
+                  canScrollDown 
+                    ? 'text-white hover:bg-emerald-600 active:scale-95' 
+                    : 'text-slate-500 hover:text-slate-300 opacity-60'
+                }`}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
